@@ -312,7 +312,7 @@ async def auto_report(
             raise FileNotFoundError("The output document path does not exist")
     else:
         raise FileNotFoundError("The input document path does not exist")
-
+    print("Report Generation Complete!")
     return
 
 def main_auto_report(
