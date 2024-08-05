@@ -101,9 +101,9 @@ def clean_report_folder():
 
 
 async def auto_report(
-    template_path: str,
     hdf_geom_file_path: str,
     hdf_plan_file_path: str,
+    report_document: Document,
     input_domain_id: str,
     stream_frequency_threshold: int,
     nlcd_resolution: int,
@@ -111,7 +111,6 @@ async def auto_report(
     wse_error_threshold: float,
     num_bins: int,
     root_dir: str,
-    report_document: Document,
     session: str,
 ):
     """
@@ -119,12 +118,12 @@ async def auto_report(
 
     Parameters
     ----------
-    template_path : str
-        The file path to the template document
     hdf_geom_file_path : str
         The path to the geometry HDF file
     hdf_plan_file_path : str
         The path to the plan HDF file
+    report_document : Docx Document
+        The document to modify
     input_domain_id : str
         Optional input for the domain ID
     stream_frequency_threshold : int
@@ -140,8 +139,6 @@ async def auto_report(
         The number of bins for the histogram
     root_dir : str
         The root directory
-    report_document : Docx Document
-        The document to modify
     session : str
         The session ID
 
@@ -191,137 +188,137 @@ async def auto_report(
     If that function fails, the error will be caught but the report will continue to generate 
     the remaining figures starting with the proceeding figure.
     """
-    if os.path.exists(template_path):
-        # Generate the Section 01 Figure 01
+
+    # Generate the Section 01 Figure 01
+    try:
+        report_document = plot_pilot_study_area(
+            report_document,
+            perimeter,
+            stream_frequency_threshold,
+            domain_id,
+            root_dir,
+        )
+    except Exception as e:
+        print(f"Error generating Section 01 Figure 01: {e}")
+        report_document = report_document
+    # Generate the Section 01 Figure 02
+    try:
+        report_document = plot_dem(report_document, perimeter, domain_id, root_dir)
+    except Exception as e:
+        print(f"Error generating Section 01 Figure 02: {e}")
+        report_document = report_document
+    # Generate the Section 04 Figure 03
+    try:
+        report_document = plot_stream_network(
+            report_document, perimeter, df_gages_usgs, domain_id, root_dir
+        )
+    except Exception as e:
+        print(f"Error generating Section 04 Figure 03: {e}")
+        report_document = report_document
+    # Generate the Section 04 Figure 04
+    try:
+        report_document = plot_streamflow_summary(
+            report_document,
+            df_gages_usgs,
+            dates,
+            domain_id,
+            root_dir,
+        )
+    except Exception as e:
+        print(f"Error generating Section 04 Figure 04: {e}")
+        report_document = report_document
+    # Generate the Section 04 Figure 05
+    try:
+        report_document = plot_nlcd(
+            report_document,
+            perimeter,
+            nlcd_resolution,
+            nlcd_year,
+            domain_id,
+            root_dir,
+        )
+    except Exception as e:
+        print(f"Error generating Section 04 Figure 05: {e}")
+        report_document = report_document
+    # Generate the Section 04 Figure 06
+    try:
+        report_document = plot_soil_porosity(
+            report_document,
+            perimeter,
+            domain_id,
+            root_dir,
+        )
+    except Exception as e:
+        print(f"Error generating Section 04 Figure 06: {e}")
+        report_document = report_document
+    # Generate the Section 04 Figure 07
+    try:
+        report_document = plot_model_mesh(
+            report_document,
+            perimeter,
+            breaklines,
+            cell_polygons,
+            domain_id,
+            root_dir,
+        )
+    except Exception as e:
+        print(f"Error generating Section 04 Figure 07: {e}")
+        report_document = report_document
+    # Generate the Appendix A Figure 09
+    try:
+        report_document = plot_wse_errors(
+            report_document,
+            cell_points,
+            wse_error_threshold,
+            num_bins,
+            domain_id,
+            root_dir,
+        )
+    except Exception as e:
+        print(f"Error generating Appendix A Figure 09: {e}")
+        report_document = report_document
+    # Generate the Appendix A Figure 10
+    try:
+        report_document = plot_wse_ttp(
+            report_document, cell_points, num_bins, domain_id, root_dir
+        )
+    except Exception as e:
+        print(f"Error generating Appendix A Figure 10: {e}")
+        report_document = report_document
+    if len(df_gages_usgs) > 0:
+        # Generate the Appendix A Figure 11
         try:
-            report_document = plot_pilot_study_area(
+            report_document = plot_hydrographs(
                 report_document,
-                perimeter,
-                stream_frequency_threshold,
-                domain_id,
-                root_dir,
-            )
-        except Exception as e:
-            print(f"Error generating Section 01 Figure 01: {e}")
-            report_document = report_document
-        # Generate the Section 01 Figure 02
-        try:
-            report_document = plot_dem(report_document, perimeter, domain_id, root_dir)
-        except Exception as e:
-            print(f"Error generating Section 01 Figure 02: {e}")
-            report_document = report_document
-        # Generate the Section 04 Figure 03
-        try:
-            report_document = plot_stream_network(
-                report_document, perimeter, df_gages_usgs, domain_id, root_dir
-            )
-        except Exception as e:
-            print(f"Error generating Section 04 Figure 03: {e}")
-            report_document = report_document
-        # Generate the Section 04 Figure 04
-        try:
-            report_document = plot_streamflow_summary(
-                report_document,
+                hdf_plan_file_path,
                 df_gages_usgs,
                 dates,
                 domain_id,
                 root_dir,
             )
         except Exception as e:
-            print(f"Error generating Section 04 Figure 04: {e}")
-            report_document = report_document
-        # Generate the Section 04 Figure 05
-        try:
-            report_document = plot_nlcd(
-                report_document,
-                perimeter,
-                nlcd_resolution,
-                nlcd_year,
-                domain_id,
-                root_dir,
-            )
-        except Exception as e:
-            print(f"Error generating Section 04 Figure 05: {e}")
-            report_document = report_document
-        # Generate the Section 04 Figure 06
-        try:
-            report_document = plot_soil_porosity(
-                report_document,
-                perimeter,
-                domain_id,
-                root_dir,
-            )
-        except Exception as e:
-            print(f"Error generating Section 04 Figure 06: {e}")
-            report_document = report_document
-        # Generate the Section 04 Figure 07
-        try:
-            report_document = plot_model_mesh(
-                report_document,
-                perimeter,
-                breaklines,
-                cell_polygons,
-                domain_id,
-                root_dir,
-            )
-        except Exception as e:
-            print(f"Error generating Section 04 Figure 07: {e}")
-            report_document = report_document
-        # Generate the Appendix A Figure 09
-        try:
-            report_document = plot_wse_errors(
-                report_document,
-                cell_points,
-                wse_error_threshold,
-                num_bins,
-                domain_id,
-                root_dir,
-            )
-        except Exception as e:
-            print(f"Error generating Appendix A Figure 09: {e}")
-            report_document = report_document
-        # Generate the Appendix A Figure 10
-        try:
-            report_document = plot_wse_ttp(
-                report_document, cell_points, num_bins, domain_id, root_dir
-            )
-        except Exception as e:
-            print(f"Error generating Appendix A Figure 10: {e}")
-            report_document = report_document
-        if len(df_gages_usgs) > 0:
-            # Generate the Appendix A Figure 11
-            try:
-                report_document = plot_hydrographs(
-                    report_document,
-                    hdf_plan_file_path,
-                    df_gages_usgs,
-                    dates,
-                    domain_id,
-                    root_dir,
-                )
-            except Exception as e:
-                print(f"Error generating Appendix A Figure 11: {e}")
-        # Save the document
-        document_path = os.path.join(
-            root_dir,
-            "data",
-            "3_session",
-            session,
-            "FFRD-RAS-Report-Automated-Updated.docx",
-        )
-        if os.path.exists(document_path):
-            report_document.save(document_path)
-        else:
-            os.makedirs(os.path.dirname(document_path), exist_ok=True)
-            report_document.save(document_path)
+            print(f"Error generating Appendix A Figure 11: {e}")
+    # Save the document
+    document_path = os.path.join(
+        root_dir,
+        "data",
+        "3_session",
+        session,
+        "FFRD-RAS-Report-Automated-Updated.docx",
+    )
+    if os.path.exists(document_path):
+        report_document.save(document_path)
     else:
-        raise FileNotFoundError("The input document path does not exist")
+        os.makedirs(os.path.dirname(document_path), exist_ok=True)
+        report_document.save(document_path)
+
     print("Report Generation Complete!")
     return
 
 def main_auto_report(
     hdf_geom_file_path: str,
     hdf_plan_file_path: str,
+    report_document: Document,
     input_domain_id: str,
     stream_frequency_threshold: int,
     nlcd_resolution: int,
@@ -340,6 +337,8 @@ def main_auto_report(
         The path to the geometry HDF file
     hdf_plan_file_path : str
         The path to the plan HDF file
+    report_document : Docx Document
+        The document to modify
     input_domain_id : str
         Optional input for the domain ID
     stream_frequency_threshold : int
@@ -365,24 +364,24 @@ def main_auto_report(
     # Apply the nest_asyncio patch
     nest_asyncio.apply()
     
-    # Clean the report folder and copy the template
-    report_document = clean_report_folder()
-    template_path = os.path.join(
-        root_dir,
-        "data",
-        "2_production",
-        "report",
-        "FFRD-RAS-Report-Automated-Template.docx",
-    )
+    # # Clean the report folder and copy the template
+    # report_document = clean_report_folder()
+    # template_path = os.path.join(
+    #     root_dir,
+    #     "data",
+    #     "2_production",
+    #     "report",
+    #     "FFRD-RAS-Report-Automated-Template.docx",
+    # )
 
     # Use asyncio.run if not in an already running event loop
     if not asyncio.get_event_loop().is_running():
         print("Running in a new event loop")
         asyncio.run(
             auto_report(
-                template_path,
                 hdf_geom_file_path,
                 hdf_plan_file_path,
+                report_document,
                 input_domain_id,
                 stream_frequency_threshold,
                 nlcd_resolution,
@@ -390,7 +389,6 @@ def main_auto_report(
                 wse_error_threshold,
                 num_bins,
                 root_dir,
-                report_document,
                 session
             )
         )
@@ -399,9 +397,9 @@ def main_auto_report(
         print("Running in an existing event loop")
         asyncio.create_task(
             auto_report(
-                template_path,
                 hdf_geom_file_path,
                 hdf_plan_file_path,
+                report_document,
                 input_domain_id,
                 stream_frequency_threshold,
                 nlcd_resolution,
@@ -409,7 +407,6 @@ def main_auto_report(
                 wse_error_threshold,
                 num_bins,
                 root_dir,
-                report_document,
                 session
             )
         )

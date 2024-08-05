@@ -7,6 +7,7 @@ import os
 import zipfile
 import asyncio
 import streamlit as st
+from docx import Document
 from pathlib import Path
 import warnings
 warnings.filterwarnings("ignore")
@@ -49,6 +50,8 @@ if __name__ == "__main__":
     st.write("file paths from the developed HEC-RAS model")
     GEOM_HDF_PATH = st.text_input("Geometry HDF File", "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/EaFT-Lavon/Model/EaFT_Lavon.g06.hdf")
     PLAN_HDF_PATH = st.text_input("Plan HDF File", "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/EaFT-Lavon/Model/EaFT_Lavon.p01.hdf")
+    REPORT_FILE = st.file_uploader("Report Document", type=["docx"], accept_multiple_files=False)
+
     st.subheader("Optional:")
     st.write("the name of the 2D flow area within the HEC-RAS model. Only necessary if more than one 2D flow area is present.")
     DOMAIN_ID = st.text_input("Domain ID", None)
@@ -71,24 +74,27 @@ if __name__ == "__main__":
         asyncio.set_event_loop(loop)
 
     if st.button("Run Report"):
-        try:
-            main_auto_report(
-                GEOM_HDF_PATH,
-                PLAN_HDF_PATH,
-                DOMAIN_ID,
-                STREAM_THRESHOLD,
-                NLCD_RES,
-                NLCD_YR,
-                WSE_ERROR_THRESHOLD,
-                NUM_BINS,
-                rootDir,
-                session_id
-            )
-            st.session_state["data_acquired"] = True
-            st.success("Report successfully generated!")
-        except Exception as e:
-            st.error(f"Error: {e}")
-            st.stop()
+        if REPORT_FILE is not None:
+            report_document = Document(REPORT_FILE)
+            try:
+                main_auto_report(
+                    GEOM_HDF_PATH,
+                    PLAN_HDF_PATH,
+                    REPORT_FILE,
+                    DOMAIN_ID,
+                    STREAM_THRESHOLD,
+                    NLCD_RES,
+                    NLCD_YR,
+                    WSE_ERROR_THRESHOLD,
+                    NUM_BINS,
+                    rootDir,
+                    session_id
+                )
+                st.session_state["data_acquired"] = True
+                st.success("Report successfully generated!")
+            except Exception as e:
+                st.error(f"Error: {e}")
+                st.stop()
 
     if st.session_state["data_acquired"]:
         # Provide a download link to the generated report

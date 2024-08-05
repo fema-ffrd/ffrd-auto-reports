@@ -212,13 +212,19 @@ def plot_pilot_study_area(
     ctx.add_basemap(
         ax=ax, crs=model_perimeter.crs, source=ctx.providers.OpenStreetMap.Mapnik
     )
+
     # Save the figure
+    # image_path = os.path.join(
+    #     root_dir,
+    #     "data",
+    #     "2_production",
+    #     "figures",
+    #     f"{domain_name}_Section01_Figure01.png",
+    # )
+
     image_path = os.path.join(
         root_dir,
-        "data",
-        "2_production",
-        "figures",
-        f"{domain_name}_Section01_Figure01.png",
+        f"{domain_name}_Section01_Figure01.png"
     )
     fig.savefig(image_path, bbox_inches="tight")
     plt.close(fig)
@@ -276,14 +282,19 @@ def plot_dem(
             ax, crs=model_perimeter.crs, source=ctx.providers.OpenStreetMap.Mapnik
         )
         # Save the figure
+        # image_path = os.path.join(
+        #     root_dir,
+        #     "data",
+        #     "2_production",
+        #     "figures",
+        #     f"{domain_name}_Section01_Figure02.png",
+        # )
         image_path = os.path.join(
             root_dir,
-            "data",
-            "2_production",
-            "figures",
-            f"{domain_name}_Section01_Figure02.png",
+            f"{domain_name}_Section01_Figure02.png"
         )
         fig.savefig(image_path, bbox_inches="tight")
+        plt.close(fig)
         # Search for the keyword within the document and add the image above it
         report_document = add_image_to_keyword(
             report_document, "«Section01_Figure02»", image_path
@@ -311,12 +322,17 @@ def plot_dem(
         # Set the colorbar label
         cbar.set_label("Elevation (ft)")
         # Save the figure
+        # image_path = os.path.join(
+        #     root_dir,
+        #     "data",
+        #     "2_production",
+        #     "figures",
+        #     f"{domain_name}_Section01_Figure02.png",
+        # )
+
         image_path = os.path.join(
             root_dir,
-            "data",
-            "2_production",
-            "figures",
-            f"{domain_name}_Section01_Figure02.png",
+            f"{domain_name}_Section01_Figure02.png"
         )
         fig.savefig(image_path, bbox_inches="tight")
         plt.close(fig)
@@ -418,12 +434,17 @@ def plot_stream_network(
     )
 
     # Save the figure
+    # image_path = os.path.join(
+    #     root_dir,
+    #     "data",
+    #     "2_production",
+    #     "figures",
+    #     f"{domain_name}_Section04_Figure03.png",
+    # )
+
     image_path = os.path.join(
         root_dir,
-        "data",
-        "2_production",
-        "figures",
-        f"{domain_name}_Section04_Figure03.png",
+        f"{domain_name}_Section04_Figure03.png"
     )
     fig.savefig(image_path, bbox_inches="tight")
     plt.close(fig)
@@ -577,12 +598,17 @@ def plot_streamflow_summary(
                 plt.tight_layout()
 
                 # Save the figure
+                # image_path = os.path.join(
+                #     root_dir,
+                #     "data",
+                #     "2_production",
+                #     "figures",
+                #     f"{domain_name}_Section04_Figure04_{station}.png",
+                # )
+
                 image_path = os.path.join(
                     root_dir,
-                    "data",
-                    "2_production",
-                    "figures",
-                    f"{domain_name}_Section04_Figure04_{station}.png",
+                    f"{domain_name}_Section04_Figure04_{station}.png"
                 )
                 fig.savefig(image_path, bbox_inches="tight")
                 plt.close(fig)
@@ -674,12 +700,17 @@ def plot_nlcd(
             ax, crs=model_perimeter.crs, source=ctx.providers.OpenStreetMap.Mapnik
         )
         # Save the figure
+        # image_path = os.path.join(
+        #     root_dir,
+        #     "data",
+        #     "2_production",
+        #     "figures",
+        #     f"{domain_name}_Section04_Figure05.png",
+        # )
+
         image_path = os.path.join(
             root_dir,
-            "data",
-            "2_production",
-            "figures",
-            f"{domain_name}_Section04_Figure05.png",
+            f"{domain_name}_Section04_Figure05.png"
         )
         fig.savefig(image_path, bbox_inches="tight")
         plt.close(fig)
@@ -751,12 +782,17 @@ def plot_soil_porosity(
         ax, crs=model_perimeter.crs, source=ctx.providers.OpenStreetMap.Mapnik
     )
     # Save the figure
+    # image_path = os.path.join(
+    #     root_dir,
+    #     "data",
+    #     "2_production",
+    #     "figures",
+    #     f"{domain_name}_Section04_Figure06.png",
+    # )
+
     image_path = os.path.join(
         root_dir,
-        "data",
-        "2_production",
-        "figures",
-        f"{domain_name}_Section04_Figure06.png",
+        f"{domain_name}_Section04_Figure06.png"
     )
     fig.savefig(image_path, bbox_inches="tight")
     plt.close(fig)
@@ -836,12 +872,17 @@ def plot_model_mesh(
     ax.set_xlabel("Longitude")
     ax.set_ylabel("Latitude")
     # Save the figure
+    # image_path = os.path.join(
+    #     root_dir,
+    #     "data",
+    #     "2_production",
+    #     "figures",
+    #     f"{domain_name}_Section04_Figure07.png",
+    # )
+
     image_path = os.path.join(
         root_dir,
-        "data",
-        "2_production",
-        "figures",
-        f"{domain_name}_Section04_Figure07.png",
+        f"{domain_name}_Section04_Figure07.png"
     )
     fig.savefig(image_path, bbox_inches="tight")
     plt.close(fig)
@@ -886,13 +927,19 @@ def plot_wse_errors(
     """
 
     # Generate the Figure for the WSE Error QC
+    # image_path = os.path.join(
+    #     root_dir,
+    #     "data",
+    #     "2_production",
+    #     "figures",
+    #     f"{domain_name}_AppendixA_Figure09.png",
+    # )
+
     image_path = os.path.join(
         root_dir,
-        "data",
-        "2_production",
-        "figures",
-        f"{domain_name}_AppendixA_Figure09.png",
+        f"{domain_name}_AppendixA_Figure09.png"
     )
+
     qc_output = wse_error_qc(
         cell_points[cell_points.mesh_name == domain_name],
         wse_error_threshold,
@@ -940,13 +987,19 @@ def plot_wse_ttp(
     """
 
     # Generate the Figure for the WSE Error QC
+    # image_path = os.path.join(
+    #     root_dir,
+    #     "data",
+    #     "2_production",
+    #     "figures",
+    #     f"{domain_name}_AppendixA_Figure10.png",
+    # )
+
     image_path = os.path.join(
         root_dir,
-        "data",
-        "2_production",
-        "figures",
-        f"{domain_name}_AppendixA_Figure10.png",
+        f"{domain_name}_AppendixA_Figure10.png"
     )
+
     qc_output = wse_ttp_qc(
         cell_points[cell_points.mesh_name == domain_name], num_bins, image_path
     )
@@ -1100,12 +1153,17 @@ def plot_hydrographs(
                     ticker.FuncFormatter(lambda x, p: format(int(x), ","))
                 )
                 # Save the figure
+                # image_path = os.path.join(
+                #     root_dir,
+                #     "data",
+                #     "2_production",
+                #     "figures",
+                #     f"{domain_name}_AppendixA_Figure11_{usgs_site_id}.png",
+                # )
+
                 image_path = os.path.join(
                     root_dir,
-                    "data",
-                    "2_production",
-                    "figures",
-                    f"{domain_name}_AppendixA_Figure11_{usgs_site_id}.png",
+                    f"{domain_name}_AppendixA_Figure11_{usgs_site_id}.png"
                 )
                 fig.savefig(image_path, bbox_inches="tight")
                 plt.close(fig)
@@ -1199,12 +1257,17 @@ def plot_hydrographs(
                         ticker.FuncFormatter(lambda x, p: format(int(x), ","))
                     )
                     # Save the figure
+                    # image_path = os.path.join(
+                    #     root_dir,
+                    #     "data",
+                    #     "2_production",
+                    #     "figures",
+                    #     f"{domain_name}_AppendixA_Figure11_{usgs_site_id}.png",
+                    # )
+
                     image_path = os.path.join(
                         root_dir,
-                        "data",
-                        "2_production",
-                        "figures",
-                        f"{domain_name}_AppendixA_Figure11_{usgs_site_id}.png",
+                        f"{domain_name}_AppendixA_Figure11_{usgs_site_id}.png"
                     )
                     fig.savefig(image_path, bbox_inches="tight")
                     plt.close(fig)
