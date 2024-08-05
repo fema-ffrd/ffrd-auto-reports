@@ -56,8 +56,8 @@ def Section03_Table03():
     return
 
 
-# Apply the nest_asyncio patch
-nest_asyncio.apply()
+# # Apply the nest_asyncio patch
+# nest_asyncio.apply()
 """
 By design asyncio does not allow its event loop to be nested.
 This presents a practical problem: When in an environment where
@@ -112,6 +112,7 @@ async def auto_report(
     num_bins: int,
     root_dir: str,
     report_document: Document,
+    session: str,
 ):
     """
     Generate the figures for the report
@@ -141,6 +142,8 @@ async def auto_report(
         The root directory
     report_document : Docx Document
         The document to modify
+    session : str
+        The session ID
 
     Returns
     -------
@@ -302,14 +305,15 @@ async def auto_report(
         document_path = os.path.join(
             root_dir,
             "data",
-            "2_production",
-            "report",
+            "3_session",
+            session,
             "FFRD-RAS-Report-Automated-Updated.docx",
         )
         if os.path.exists(document_path):
             report_document.save(document_path)
         else:
-            raise FileNotFoundError("The output document path does not exist")
+            os.makedirs(os.path.dirname(document_path), exist_ok=True)
+            report_document.save(document_path)
     else:
         raise FileNotFoundError("The input document path does not exist")
     print("Report Generation Complete!")
@@ -325,6 +329,7 @@ def main_auto_report(
     wse_error_threshold: float,
     num_bins: int,
     root_dir: str,
+    session: str,
 ):
     """
     Main function to run the auto report
@@ -350,12 +355,16 @@ def main_auto_report(
         The number of bins for the histogram
     root_dir : str
         The root directory
+    session : str
+        The session ID
 
     Returns
     -------
     None
     """
-
+    # Apply the nest_asyncio patch
+    nest_asyncio.apply()
+    
     # Clean the report folder and copy the template
     report_document = clean_report_folder()
     template_path = os.path.join(
@@ -382,6 +391,7 @@ def main_auto_report(
                 num_bins,
                 root_dir,
                 report_document,
+                session
             )
         )
     else:
@@ -400,5 +410,6 @@ def main_auto_report(
                 num_bins,
                 root_dir,
                 report_document,
+                session
             )
         )
