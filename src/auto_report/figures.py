@@ -448,7 +448,7 @@ def plot_streamflow_summary(
     if len(df_gages_usgs) > 0:
         # Create an instance of the NWIS class
         nwis = NWIS()
-        stations = df_gages_usgs.code.values
+        stations = df_gages_usgs.site_no.values
         # Get all available streamflow data within the specified date range
         qobs_ds = nwis.get_streamflow(
             stations, dates, mmd=False, to_xarray=True, freq="dv"
@@ -994,6 +994,26 @@ def plot_hydrographs(
     """
     Generate the Appendix A Figure 11 for the report
     Gage calibration plots
+
+    Parameters
+    ----------
+    report_document : Docx Document
+        The document to modify
+    hdf_plan_file_path : str
+        The path to the HDF plan file
+    df_gages_usgs : gpd.GeoDataFrame
+        The USGS gages located within the model perimeter
+    dates : tuple
+        The dates for the calibration period
+    domain_name : str
+        The name of the domain
+    root_dir : str
+        The root directory
+
+    Returns
+    -------
+    report_document : Docx Document
+        The modified document
     """
     print("Processing for the gage calibration plots...")
     print(f"Calibration period: {dates[0]} to {dates[1]}")
@@ -1016,98 +1036,18 @@ def plot_hydrographs(
         ]
         # Trivial scenario: one row returned indicating one single gage is within the buffer distance
         if len(gage_df) == 1:
-            # Modeled streamflow
-            qsim_df = (
-                ref_lines_ds.sel(refln_id=line_id)
-                .Flow.to_dataframe()["Flow"]
-                .to_frame()
-            )
-            qsim_df.columns = ["Modeled"]
-            qsim_freq = find_timstep_freq(qsim_df)
-
             # Site metadata
-            usgs_site_name = gage_df.name.values[0]
-            usgs_site_id = gage_df.code.values[0]
+            usgs_site_name = gage_df.station_nm.values[0]
+            usgs_site_id = gage_df.site_no.values[0]
             station_id = f"USGS-{usgs_site_id}"
+            print(f"Plotting {station_id} for reference line {line_id}")
 
-            # Observed streamflow
-            qobs_df = (
-                qobs_ds.sel(station_id=station_id)
-                .discharge.to_dataframe()["discharge"]
-                .to_frame()
-            )
-            qobs_df.columns = ["Observed"]
-            qobs_df["Observed"] = (
-                qobs_df["Observed"] * 35.3147
-            )  # Convert from cms to cfs
-            qobs_freq = find_timstep_freq(qobs_df)
-
-            # Resample the data to the same timestep frequency of the model
-            if qobs_freq < qsim_freq:
-                print(f"Resampling the observed data from {qobs_freq} to {qsim_freq}")
-                qobs_df = qobs_df.resample(qsim_freq).mean()
-            elif qobs_freq > qsim_freq:
-                print(f"Resampling the modeled data from {qsim_freq} to {qobs_freq}")
-                qsim_df = qsim_df.resample(qobs_freq).mean()
-            else:
+            if station_id not in qobs_ds.station_id.values:
                 print(
-                    f"Observed and modeled data are at the same timestep frequency of {qobs_freq}"
+                    f"USGS station {station_id} is not available for the calibration period"
                 )
-
-            # Generate the figure
-            fig, ax = plt.subplots(figsize=(10, 10))
-            # Plot the modeled vs observed streamflow
-            qobs_df.plot(ax=ax, color="blue", label="Observed", alpha=0.7)
-            qsim_df.plot(ax=ax, color="red", label="Modeled", alpha=0.7)
-            # Add grid lines
-            ax.grid()
-            # Add a legend
-            ax.legend()
-            # Add axis labels
-            ax.set_xlabel("Date")
-            ax.set_ylabel("Streamflow (cfs)")
-            # Add a title
-            ax.set_title(f"USGS-{usgs_site_id} {usgs_site_name}")
-            # Set the custom y-axis formatter
-            ax.get_yaxis().set_major_formatter(
-                ticker.FuncFormatter(lambda x, p: format(int(x), ","))
-            )
-            # Save the figure
-            image_path = os.path.join(
-                root_dir,
-                "data",
-                "2_production",
-                "figures",
-                f"{domain_name}_AppendixA_Figure11_{usgs_site_id}.png",
-            )
-            fig.savefig(image_path, bbox_inches="tight")
-            plt.close(fig)
-
-            # Search for the keyword within the document and add the image above it
-            report_document = add_image_to_keyword(
-                report_document, "«AppendixA_Figure11»", image_path
-            )
-        # Non-trivial scenario: no rows returned indicating no gages are within the buffer distance
-        # Need to buffer out the reference line until the closest gage (within reason) is found
-        elif len(gage_df) == 0:
-            # Increment the buffer distance
-            while len(gage_df) == 0:
-                buffer_increment += 0.001
-                if buffer_increment > 0.01:
-                    print(
-                        f"No gages found within ~1-km of the reference line: {line_id}."
-                    )
-                    break
-                else:
-                    print(
-                        f"No gages found near the reference line {line_id}. Incrementing buffer distance by ~100-m."
-                    )
-                    gage_df = df_gages_usgs[
-                        df_gages_usgs.within(
-                            ref_lines.geometry.buffer(buffer_increment).iloc[idx]
-                        )
-                    ]
-            if len(gage_df) == 1:
+                continue
+            else:
                 # Modeled streamflow
                 qsim_df = (
                     ref_lines_ds.sel(refln_id=line_id)
@@ -1115,12 +1055,9 @@ def plot_hydrographs(
                     .to_frame()
                 )
                 qsim_df.columns = ["Modeled"]
-
-                usgs_site_name = gage_df.name.values[0]
-                usgs_site_id = gage_df.code.values[0]
+                qsim_freq = find_timstep_freq(qsim_df)
 
                 # Observed streamflow
-                station_id = f"USGS-{usgs_site_id}"
                 qobs_df = (
                     qobs_ds.sel(station_id=station_id)
                     .discharge.to_dataframe()["discharge"]
@@ -1130,6 +1067,19 @@ def plot_hydrographs(
                 qobs_df["Observed"] = (
                     qobs_df["Observed"] * 35.3147
                 )  # Convert from cms to cfs
+                qobs_freq = find_timstep_freq(qobs_df)
+
+                # Resample the data to the same timestep frequency of the model
+                if qobs_freq < qsim_freq:
+                    print(f"Resampling the observed data from {qobs_freq} to {qsim_freq}")
+                    qobs_df = qobs_df.resample(qsim_freq).mean()
+                elif qobs_freq > qsim_freq:
+                    print(f"Resampling the modeled data from {qsim_freq} to {qobs_freq}")
+                    qsim_df = qsim_df.resample(qobs_freq).mean()
+                else:
+                    print(
+                        f"Observed and modeled data are at the same timestep frequency of {qobs_freq}"
+                    )
 
                 # Generate the figure
                 fig, ax = plt.subplots(figsize=(10, 10))
@@ -1164,9 +1114,107 @@ def plot_hydrographs(
                 report_document = add_image_to_keyword(
                     report_document, "«AppendixA_Figure11»", image_path
                 )
+        # Non-trivial scenario: no rows returned indicating no gages are within the buffer distance
+        # Need to buffer out the reference line until the closest gage (within reason) is found
+        elif len(gage_df) == 0:
+            # Increment the buffer distance
+            while len(gage_df) == 0:
+                buffer_increment += 0.001
+                if buffer_increment > 0.01:
+                    print(
+                        f"No gages found within ~1-km of the reference line: {line_id}."
+                    )
+                    break
+                else:
+                    print(
+                        f"No gages found near the reference line {line_id}. Incrementing buffer distance by ~100-m."
+                    )
+                    gage_df = df_gages_usgs[
+                        df_gages_usgs.within(
+                            ref_lines.geometry.buffer(buffer_increment).iloc[idx]
+                        )
+                    ]
+            if len(gage_df) == 1:
+                # Site metadata
+                usgs_site_name = gage_df.station_nm.values[0]
+                usgs_site_id = gage_df.site_no.values[0]
+                station_id = f"USGS-{usgs_site_id}"
+                print(f"Plotting {station_id} for reference line {line_id}")
+
+                if station_id not in qobs_ds.station_id.values:
+                    print(
+                        f"USGS station {station_id} is not available for the calibration period"
+                    )
+                    continue
+                else:
+                    # Modeled streamflow
+                    qsim_df = (
+                        ref_lines_ds.sel(refln_id=line_id)
+                        .Flow.to_dataframe()["Flow"]
+                        .to_frame()
+                    )
+                    qsim_df.columns = ["Modeled"]
+                    qsim_freq = find_timstep_freq(qsim_df)
+
+                    # Observed streamflow
+                    qobs_df = (
+                        qobs_ds.sel(station_id=station_id)
+                        .discharge.to_dataframe()["discharge"]
+                        .to_frame()
+                    )
+                    qobs_df.columns = ["Observed"]
+                    qobs_df["Observed"] = (
+                        qobs_df["Observed"] * 35.3147
+                    )  # Convert from cms to cfs
+                    qobs_freq = find_timstep_freq(qobs_df)
+
+                    # Resample the data to the same timestep frequency of the model
+                    if qobs_freq < qsim_freq:
+                        print(f"Resampling the observed data from {qobs_freq} to {qsim_freq}")
+                        qobs_df = qobs_df.resample(qsim_freq).mean()
+                    elif qobs_freq > qsim_freq:
+                        print(f"Resampling the modeled data from {qsim_freq} to {qobs_freq}")
+                        qsim_df = qsim_df.resample(qobs_freq).mean()
+                    else:
+                        print(
+                            f"Observed and modeled data are at the same timestep frequency of {qobs_freq}"
+                        )
+
+                    # Generate the figure
+                    fig, ax = plt.subplots(figsize=(10, 10))
+                    # Plot the modeled vs observed streamflow
+                    qobs_df.plot(ax=ax, color="blue", label="Observed", alpha=0.7)
+                    qsim_df.plot(ax=ax, color="red", label="Modeled", alpha=0.7)
+                    # Add grid lines
+                    ax.grid()
+                    # Add a legend
+                    ax.legend()
+                    # Add axis labels
+                    ax.set_xlabel("Date")
+                    ax.set_ylabel("Streamflow (cfs)")
+                    # Add a title
+                    ax.set_title(f"USGS-{usgs_site_id} {usgs_site_name}")
+                    # Set the custom y-axis formatter
+                    ax.get_yaxis().set_major_formatter(
+                        ticker.FuncFormatter(lambda x, p: format(int(x), ","))
+                    )
+                    # Save the figure
+                    image_path = os.path.join(
+                        root_dir,
+                        "data",
+                        "2_production",
+                        "figures",
+                        f"{domain_name}_AppendixA_Figure11_{usgs_site_id}.png",
+                    )
+                    fig.savefig(image_path, bbox_inches="tight")
+                    plt.close(fig)
+
+                    # Search for the keyword within the document and add the image above it
+                    report_document = add_image_to_keyword(
+                        report_document, "«AppendixA_Figure11»", image_path
+                    )
             elif len(gage_df) > 1:
                 raise ValueError(
                     "Multiple gages found within the minimum buffer distance of the reference line."
                 )
-
     return report_document

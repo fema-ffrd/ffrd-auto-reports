@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # Imports #####################################################################
-
+import pandas as pd
 import geopandas as gpd
 import py3dep
 from pygeohydro import NWIS, DataNotAvailableError
@@ -156,6 +156,65 @@ def get_nlcd_data(model_perimeter: gpd.GeoDataFrame, resolution: int, year: int)
         print(f"Failed retrieving NLCD data: {e}")
         return None
 
+def get_usgs_stations(model_perimeter: gpd.GeoDataFrame,
+                      dates: tuple):
+    """
+    Get the USGS gage stations within the model perimeter
+
+    Parameters
+    ----------
+    model_perimeter : gpd.GeoDataFrame
+        The perimeter of the model
+    dates : tuple
+        The start and end dates for the gage station data retrieval
+
+    Returns
+    -------
+    stations: list
+        The USGS gage stations within the model perimeter
+    """
+    # Create an instance of the NWIS class
+    nwis = NWIS()
+
+    # Get the bounding box of the model perimeter
+    bbox = tuple(model_perimeter.bounds.values[0]) # (minx, miny, maxx, maxy)
+
+    # Query gage stations with daily values
+    query_dv = {
+        "bBox": ",".join(f"{b:.06f}" for b in bbox),
+        "hasDataTypeCd": "dv",
+        "outputDataTypeCd": "dv",
+    }
+    info_box = nwis.get_info(query_dv)
+
+    dv_gages = info_box[
+        (info_box.begin_date <= dates[0]) & (info_box.end_date >= dates[1])
+    ]
+    # Query gage stations with instantaneous values
+    query_iv = {
+        "bBox": ",".join(f"{b:.06f}" for b in bbox),
+        "hasDataTypeCd": "iv",
+        "outputDataTypeCd": "iv",
+    }
+    info_box = nwis.get_info(query_iv)
+
+    iv_gages = info_box[
+        (info_box.begin_date <= dates[0]) & (info_box.end_date >= dates[1])
+    ]
+
+    # Combine the gage stations with daily and instantaneous values
+    df_gages_usgs = pd.concat([dv_gages, iv_gages]).drop_duplicates(subset=["site_no"])
+
+    # Convert df_gages_usgs to a geodataframe
+    df_gages_usgs = gpd.GeoDataFrame(
+        df_gages_usgs,
+        geometry=gpd.points_from_xy(df_gages_usgs.dec_long_va, df_gages_usgs.dec_lat_va),
+        crs="EPSG:4326",
+    )
+    # Filter the gages to only include those within the model perimeter
+    # This is necesarry since the NWIS() class only support query by rectangular bbox
+    df_gages_usgs = df_gages_usgs[df_gages_usgs.within(model_perimeter.geometry.iloc[0])]
+    return df_gages_usgs
 
 def get_nwis_streamflow(df_gages_usgs: gpd.GeoDataFrame, dates: tuple):
     """
@@ -175,7 +234,7 @@ def get_nwis_streamflow(df_gages_usgs: gpd.GeoDataFrame, dates: tuple):
     """
     # Create an instance of the NWIS class
     nwis = NWIS()
-    stations = df_gages_usgs.code.values
+    stations = df_gages_usgs.site_no.values
     # Get all available streamflow data within the specified date range for the gage stations
     try:
         qobs_ds = nwis.get_streamflow(

@@ -7,9 +7,9 @@ import shutil
 import asyncio
 import nest_asyncio
 import geopandas as gpd
-from ulmo_api import select_gages
 from docx import Document
 
+from hy_river import get_usgs_stations
 from hdf_utils import get_hdf_geom, get_hdf_plan
 
 from figures import (
@@ -164,20 +164,7 @@ async def auto_report(
     # Collect all USGS gages located within the perimeter boundary
     print("Processing for the USGS gages dataset...")
     try:
-        df_gages_usgs = select_gages(
-            selection_type="spatial_file",
-            parameter="Streamflow",
-            spatial_file=geojson_obj,
-            filter_to_realtime=False,
-        )
-        # Convert df_gages_usgs to a geodataframe
-        df_gages_usgs = gpd.GeoDataFrame(
-            df_gages_usgs,
-            geometry=gpd.points_from_xy(df_gages_usgs.lon, df_gages_usgs.lat),
-            crs="EPSG:4326",
-        )
-        # Filter the gages to only include those within the model perimeter
-        df_gages_usgs = df_gages_usgs[df_gages_usgs.within(perimeter.geometry.iloc[0])]
+        df_gages_usgs = get_usgs_stations(perimeter, dates)
     except Exception as e:
         """
         403 Client Error: You are being blocked by the USGS API due to too many requests.
@@ -298,7 +285,6 @@ async def auto_report(
         except Exception as e:
             print(f"Error generating Appendix A Figure 10: {e}")
             report_document = report_document
-        
         if len(df_gages_usgs) > 0:
             # Generate the Appendix A Figure 11
             try:
