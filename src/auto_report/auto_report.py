@@ -179,6 +179,17 @@ async def auto_report(
         # Filter the gages to only include those within the model perimeter
         df_gages_usgs = df_gages_usgs[df_gages_usgs.within(perimeter.geometry.iloc[0])]
     except Exception as e:
+        """
+        403 Client Error: You are being blocked by the USGS API due to too many requests.
+        Blocking access to a service should only occur if the USGS believes that your use 
+        of the service is so excessive that it is seriously impacting others using the service.
+
+        To get unblocked, send us the URL you are using along with the IP using this form. 
+        We may require changes to your query and frequency of use in order to give you access 
+        to the service again.
+
+        Contact USGS: https://answers.usgs.gov/
+        """
         print(f"Error processing the USGS gages dataset: {e}")
         # Create an empty geodataframe if the gages dataset fails to process
         df_gages_usgs = gpd.GeoDataFrame(
