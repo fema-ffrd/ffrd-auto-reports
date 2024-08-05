@@ -376,9 +376,13 @@ def plot_stream_network(
         )
     else:
         num_dams = "Data Unavailable"
-    # add the gage locations to the plot
-    df_gages_usgs.plot(ax=ax, color="red", markersize=100, marker="o", zorder=3)
-    num_gages = len(df_gages_usgs)
+    # Check if the USGS gages are available to plot
+    if len(df_gages_usgs) > 0:
+        # add the gage locations to the plot
+        df_gages_usgs.plot(ax=ax, color="red", markersize=100, marker="o", zorder=3)
+        num_gages = len(df_gages_usgs)
+    else:
+        num_gages = "Data Unavailable"
     # set an x and y axis labels
     ax.set_xlabel("Longitude")
     ax.set_ylabel("Latitude")
@@ -591,7 +595,7 @@ def plot_streamflow_summary(
             print("No USGS stations in the watershed with daily values")
             return report_document
     else:
-        print("No USGS stations in the watershed")
+        print("USGS gages are currently unavailable")
         return report_document
 
 
