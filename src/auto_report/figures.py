@@ -7,6 +7,7 @@ import pandas as pd
 import numpy as np
 from docx import Document
 from docx.shared import Inches
+import streamlit as st
 import contextily as ctx
 import geopandas as gpd
 from rashdf import RasPlanHdf
@@ -31,9 +32,11 @@ from hy_river import (
     get_nid_dams,
     get_nlcd_data,
     get_nwis_streamflow,
+    filter_nid,
 )
 
 # Functions ###################################################################
+
 
 def calc_aep(data: pd.DataFrame):
     """
@@ -128,7 +131,6 @@ def plot_pilot_study_area(
     report_document : Docx Document
         The modified document
     """
-    print("Processing for the HUC04 pilot boundary...")
     # determine the center of the model perimeter
     model_bbox = model_perimeter.bounds
     center = (
@@ -213,25 +215,14 @@ def plot_pilot_study_area(
         ax=ax, crs=model_perimeter.crs, source=ctx.providers.OpenStreetMap.Mapnik
     )
 
-    # Save the figure
-    # image_path = os.path.join(
-    #     root_dir,
-    #     "data",
-    #     "2_production",
-    #     "figures",
-    #     f"{domain_name}_Section01_Figure01.png",
-    # )
-
-    image_path = os.path.join(
-        root_dir,
-        f"{domain_name}_Section01_Figure01.png"
-    )
+    image_path = os.path.join(root_dir, f"{domain_name}_Section01_Figure01.png")
     fig.savefig(image_path, bbox_inches="tight")
     plt.close(fig)
     # Search for the keyword within the document and add the image above it
     report_document = add_image_to_keyword(
         report_document, "«Section01_Figure01»", image_path
     )
+    os.remove(image_path)
     return report_document
 
 
@@ -261,7 +252,6 @@ def plot_dem(
     report_document : Docx Document
         The modified document
     """
-    print("Processing for the DEM dataset...")
     # Get the DEM data within the model perimeter
     dem = get_dem_data(model_perimeter)
     # Generate the figure
@@ -282,23 +272,14 @@ def plot_dem(
             ax, crs=model_perimeter.crs, source=ctx.providers.OpenStreetMap.Mapnik
         )
         # Save the figure
-        # image_path = os.path.join(
-        #     root_dir,
-        #     "data",
-        #     "2_production",
-        #     "figures",
-        #     f"{domain_name}_Section01_Figure02.png",
-        # )
-        image_path = os.path.join(
-            root_dir,
-            f"{domain_name}_Section01_Figure02.png"
-        )
+        image_path = os.path.join(root_dir, f"{domain_name}_Section01_Figure02.png")
         fig.savefig(image_path, bbox_inches="tight")
         plt.close(fig)
         # Search for the keyword within the document and add the image above it
         report_document = add_image_to_keyword(
             report_document, "«Section01_Figure02»", image_path
         )
+        os.remove(image_path)
         return report_document
     else:
         # Convert units from m to ft
@@ -322,24 +303,14 @@ def plot_dem(
         # Set the colorbar label
         cbar.set_label("Elevation (ft)")
         # Save the figure
-        # image_path = os.path.join(
-        #     root_dir,
-        #     "data",
-        #     "2_production",
-        #     "figures",
-        #     f"{domain_name}_Section01_Figure02.png",
-        # )
-
-        image_path = os.path.join(
-            root_dir,
-            f"{domain_name}_Section01_Figure02.png"
-        )
+        image_path = os.path.join(root_dir, f"{domain_name}_Section01_Figure02.png")
         fig.savefig(image_path, bbox_inches="tight")
         plt.close(fig)
         # Search for the keyword within the document and add the image above it
         report_document = add_image_to_keyword(
             report_document, "«Section01_Figure02»", image_path
         )
+        os.remove(image_path)
         return report_document
 
 
@@ -348,7 +319,10 @@ def plot_stream_network(
     model_perimeter: gpd.GeoDataFrame,
     df_gages_usgs: gpd.GeoDataFrame,
     domain_name: str,
+    nid_parquet_file_path: str,
+    nid_dam_height: int,
     root_dir: str,
+    active_streamlit: bool,
 ):
     """
     Generate the Section 04 Figure 03 for the report
@@ -364,34 +338,50 @@ def plot_stream_network(
         The USGS gages located within the model perimeter
     domain_name : str
         The name of the domain
+    nid_parquet_file_path: str
+        The file path to the parquet file containing the backup NID dam data
+    nid_dam_height: int
+        The height threshold for the NID dams
     root_dir : str
         The root directory
+    active_streamlit : bool
+        If true, print statements will be displayed in the Streamlit app
+        If false, print statements will be displayed in the terminal
 
     return
     ------
     report_document : Docx Document
         The modified document
     """
-    print("Processing for the NHD Flowlines dataset...")
     # Generate the figure
     fig, ax = plt.subplots(figsize=(10, 10))
     model_perimeter.boundary.plot(ax=ax, color="black", linewidth=3, zorder=4)
     # Query all NHD streams within the domain
     streams = get_nhd_flowlines(model_perimeter)
-    if streams is not None:
+    if isinstance(streams, str):
+        num_streams = streams
+        if active_streamlit:
+            st.write(f"Error retrieving NHD streams. {streams}")
+        else:
+            print(f"Error retrieving NHD streams. {streams}")
+    else:
+        print("Successfully retrieved NHD streams")
         streams.plot(ax=ax, color="blue", linewidth=1, zorder=1)
         num_streams = len(streams["gnis_name"].unique())
-    else:
-        num_streams = "Data Unavailable"
+
     # Query all NID dams within the domain
-    dams = get_nid_dams(model_perimeter)
+    dams = filter_nid(nid_parquet_file_path, model_perimeter, nid_dam_height)
     if dams is not None:
         num_dams = len(dams)
         dams.plot(
             ax=ax, color="purple", edgecolor="k", markersize=100, marker="^", zorder=2
         )
     else:
-        num_dams = "Data Unavailable"
+        print(
+            f"No dams found in the NID inventory with a height greater than {nid_dam_height} ft"
+        )
+        num_dams = 0
+
     # Check if the USGS gages are available to plot
     if len(df_gages_usgs) > 0:
         # add the gage locations to the plot
@@ -416,7 +406,7 @@ def plot_stream_network(
     labels = [
         "Model Domain",
         f"NHD Streams: {num_streams}",
-        f"NID Dams: {num_dams}",
+        f"NID Dams >= {nid_dam_height} ft: {num_dams}",
         f"USGS Gages: {num_gages}",
     ]
 
@@ -434,24 +424,14 @@ def plot_stream_network(
     )
 
     # Save the figure
-    # image_path = os.path.join(
-    #     root_dir,
-    #     "data",
-    #     "2_production",
-    #     "figures",
-    #     f"{domain_name}_Section04_Figure03.png",
-    # )
-
-    image_path = os.path.join(
-        root_dir,
-        f"{domain_name}_Section04_Figure03.png"
-    )
+    image_path = os.path.join(root_dir, f"{domain_name}_Section04_Figure03.png")
     fig.savefig(image_path, bbox_inches="tight")
     plt.close(fig)
     # Search for the keyword within the document and add the image above it
     report_document = add_image_to_keyword(
         report_document, "«Section04_Figure03»", image_path
     )
+    os.remove(image_path)
     return report_document
 
 
@@ -465,6 +445,24 @@ def plot_streamflow_summary(
     """
     Generate the Section 04 Figure 04 for the report
     Gage streamflow summary analytics
+
+    Parameters
+    ----------
+    report_document : Docx Document
+        The document to modify
+    df_gages_usgs : gpd.GeoDataFrame
+        The USGS gages located within the model perimeter
+    dates : tuple
+        The start and end dates to retrieve the streamflow data for
+    domain_name : str
+        The name of the domain
+    root_dir : str
+        The root directory
+
+    return
+    ------
+    report_document : Docx Document
+        The modified document
     """
     if len(df_gages_usgs) > 0:
         # Create an instance of the NWIS class
@@ -598,17 +596,8 @@ def plot_streamflow_summary(
                 plt.tight_layout()
 
                 # Save the figure
-                # image_path = os.path.join(
-                #     root_dir,
-                #     "data",
-                #     "2_production",
-                #     "figures",
-                #     f"{domain_name}_Section04_Figure04_{station}.png",
-                # )
-
                 image_path = os.path.join(
-                    root_dir,
-                    f"{domain_name}_Section04_Figure04_{station}.png"
+                    root_dir, f"{domain_name}_Section04_Figure04_{station}.png"
                 )
                 fig.savefig(image_path, bbox_inches="tight")
                 plt.close(fig)
@@ -616,6 +605,7 @@ def plot_streamflow_summary(
                 report_document = add_image_to_keyword(
                     report_document, "«Section04_Figure04»", image_path
                 )
+                os.remove(image_path)
             return report_document
         else:
             print("No USGS stations in the watershed with daily values")
@@ -632,6 +622,7 @@ def plot_nlcd(
     nlcd_year: int,
     domain_name: str,
     root_dir: str,
+    active_streamlit: bool,
 ):
     """
     Generate the Section 04 Figure 05 for the report
@@ -651,17 +642,22 @@ def plot_nlcd(
         The name of the domain
     root_dir : str
         The root directory
+    active_streamlit : bool
+        If true, print statements will be displayed in the Streamlit app
+        If false, print statements will be displayed in the terminal
 
     return
     ------
     report_document : Docx Document
         The modified document
     """
-    print("Processing for the NLCD dataset...")
     # Retrieve the NLCD data at 30-m resolution for 2019
     nlcd = get_nlcd_data(model_perimeter, nlcd_resolution, nlcd_year)
-    if nlcd is None:
-        print("NLCD data is unavailable")
+    if isinstance(nlcd, str):
+        if active_streamlit:
+            st.error(f"Error generating figure: {nlcd}")
+        else:
+            print(f"Error generating figure: {nlcd}")
         return report_document
     else:
         # Collect the NLCD class names for each ID
@@ -700,24 +696,14 @@ def plot_nlcd(
             ax, crs=model_perimeter.crs, source=ctx.providers.OpenStreetMap.Mapnik
         )
         # Save the figure
-        # image_path = os.path.join(
-        #     root_dir,
-        #     "data",
-        #     "2_production",
-        #     "figures",
-        #     f"{domain_name}_Section04_Figure05.png",
-        # )
-
-        image_path = os.path.join(
-            root_dir,
-            f"{domain_name}_Section04_Figure05.png"
-        )
+        image_path = os.path.join(root_dir, f"{domain_name}_Section04_Figure05.png")
         fig.savefig(image_path, bbox_inches="tight")
         plt.close(fig)
         # Search for the keyword within the document and add the image above it
         report_document = add_image_to_keyword(
             report_document, "«Section04_Figure05»", image_path
         )
+        os.remove(image_path)
         return report_document
 
 
@@ -749,7 +735,6 @@ def plot_soil_porosity(
     """
 
     # Acquire the soil porosity dataset for the model perimeter
-    print("Processing for soil the porosity dataset...")
     por = gh.soil_properties("por")
     por = geoutils.xarray_geomask(
         por, model_perimeter.geometry.iloc[0], model_perimeter.crs
@@ -782,24 +767,14 @@ def plot_soil_porosity(
         ax, crs=model_perimeter.crs, source=ctx.providers.OpenStreetMap.Mapnik
     )
     # Save the figure
-    # image_path = os.path.join(
-    #     root_dir,
-    #     "data",
-    #     "2_production",
-    #     "figures",
-    #     f"{domain_name}_Section04_Figure06.png",
-    # )
-
-    image_path = os.path.join(
-        root_dir,
-        f"{domain_name}_Section04_Figure06.png"
-    )
+    image_path = os.path.join(root_dir, f"{domain_name}_Section04_Figure06.png")
     fig.savefig(image_path, bbox_inches="tight")
     plt.close(fig)
     # Search for the keyword within the document and add the image above it
     report_document = add_image_to_keyword(
         report_document, "«Section04_Figure06»", image_path
     )
+    os.remove(image_path)
     return report_document
 
 
@@ -872,24 +847,14 @@ def plot_model_mesh(
     ax.set_xlabel("Longitude")
     ax.set_ylabel("Latitude")
     # Save the figure
-    # image_path = os.path.join(
-    #     root_dir,
-    #     "data",
-    #     "2_production",
-    #     "figures",
-    #     f"{domain_name}_Section04_Figure07.png",
-    # )
-
-    image_path = os.path.join(
-        root_dir,
-        f"{domain_name}_Section04_Figure07.png"
-    )
+    image_path = os.path.join(root_dir, f"{domain_name}_Section04_Figure07.png")
     fig.savefig(image_path, bbox_inches="tight")
     plt.close(fig)
     # Search for the keyword within the document and add the image above it
     report_document = add_image_to_keyword(
         report_document, "«Section04_Figure07»", image_path
     )
+    os.remove(image_path)
     return report_document
 
 
@@ -927,18 +892,7 @@ def plot_wse_errors(
     """
 
     # Generate the Figure for the WSE Error QC
-    # image_path = os.path.join(
-    #     root_dir,
-    #     "data",
-    #     "2_production",
-    #     "figures",
-    #     f"{domain_name}_AppendixA_Figure09.png",
-    # )
-
-    image_path = os.path.join(
-        root_dir,
-        f"{domain_name}_AppendixA_Figure09.png"
-    )
+    image_path = os.path.join(root_dir, f"{domain_name}_AppendixA_Figure09.png")
 
     qc_output = wse_error_qc(
         cell_points[cell_points.mesh_name == domain_name],
@@ -951,6 +905,7 @@ def plot_wse_errors(
         report_document = add_image_to_keyword(
             report_document, "«AppendixA_Figure09»", image_path
         )
+        os.remove(image_path)
         return report_document
     else:
         return report_document
@@ -987,18 +942,7 @@ def plot_wse_ttp(
     """
 
     # Generate the Figure for the WSE Error QC
-    # image_path = os.path.join(
-    #     root_dir,
-    #     "data",
-    #     "2_production",
-    #     "figures",
-    #     f"{domain_name}_AppendixA_Figure10.png",
-    # )
-
-    image_path = os.path.join(
-        root_dir,
-        f"{domain_name}_AppendixA_Figure10.png"
-    )
+    image_path = os.path.join(root_dir, f"{domain_name}_AppendixA_Figure10.png")
 
     qc_output = wse_ttp_qc(
         cell_points[cell_points.mesh_name == domain_name], num_bins, image_path
@@ -1008,6 +952,7 @@ def plot_wse_ttp(
         report_document = add_image_to_keyword(
             report_document, "«AppendixA_Figure10»", image_path
         )
+        os.remove(image_path)
         return report_document
     else:
         return report_document
@@ -1043,6 +988,7 @@ def plot_hydrographs(
     dates: tuple,
     domain_name: str,
     root_dir: str,
+    active_streamlit: bool,
 ):
     """
     Generate the Appendix A Figure 11 for the report
@@ -1062,13 +1008,15 @@ def plot_hydrographs(
         The name of the domain
     root_dir : str
         The root directory
+    active_streamlit : bool
+        If true, print statements will be displayed in the Streamlit app
+        If false, print statements will be displayed in the terminal
 
     Returns
     -------
     report_document : Docx Document
         The modified document
     """
-    print("Processing for the gage calibration plots...")
     print(f"Calibration period: {dates[0]} to {dates[1]}")
     # Open the HDF plan file for the reference line data
     plan_hdf = RasPlanHdf.open_uri(hdf_plan_file_path)
@@ -1078,6 +1026,12 @@ def plot_hydrographs(
 
     # Query the NWIS server for streamflow at the gage locations
     qobs_ds = get_nwis_streamflow(df_gages_usgs, dates)
+    if isinstance(qobs_ds, str):
+        if active_streamlit:
+            st.error(f"Error generating figure: {qobs_ds}")
+        else:
+            print(f"Error generating figure: {qobs_ds}")
+        return report_document
 
     # Units of degrees for EPSG:4326 to buffer outwards from the reference line location
     buffer_increment = 0.001  # Ex: 0.001 degrees is approximately 100 meters
@@ -1124,10 +1078,14 @@ def plot_hydrographs(
 
                 # Resample the data to the same timestep frequency of the model
                 if qobs_freq < qsim_freq:
-                    print(f"Resampling the observed data from {qobs_freq} to {qsim_freq}")
+                    print(
+                        f"Resampling the observed data from {qobs_freq} to {qsim_freq}"
+                    )
                     qobs_df = qobs_df.resample(qsim_freq).mean()
                 elif qobs_freq > qsim_freq:
-                    print(f"Resampling the modeled data from {qsim_freq} to {qobs_freq}")
+                    print(
+                        f"Resampling the modeled data from {qsim_freq} to {qobs_freq}"
+                    )
                     qsim_df = qsim_df.resample(qobs_freq).mean()
                 else:
                     print(
@@ -1153,25 +1111,16 @@ def plot_hydrographs(
                     ticker.FuncFormatter(lambda x, p: format(int(x), ","))
                 )
                 # Save the figure
-                # image_path = os.path.join(
-                #     root_dir,
-                #     "data",
-                #     "2_production",
-                #     "figures",
-                #     f"{domain_name}_AppendixA_Figure11_{usgs_site_id}.png",
-                # )
-
                 image_path = os.path.join(
-                    root_dir,
-                    f"{domain_name}_AppendixA_Figure11_{usgs_site_id}.png"
+                    root_dir, f"{domain_name}_AppendixA_Figure11_{usgs_site_id}.png"
                 )
                 fig.savefig(image_path, bbox_inches="tight")
                 plt.close(fig)
-
                 # Search for the keyword within the document and add the image above it
                 report_document = add_image_to_keyword(
                     report_document, "«AppendixA_Figure11»", image_path
                 )
+                os.remove(image_path)
         # Non-trivial scenario: no rows returned indicating no gages are within the buffer distance
         # Need to buffer out the reference line until the closest gage (within reason) is found
         elif len(gage_df) == 0:
@@ -1228,10 +1177,14 @@ def plot_hydrographs(
 
                     # Resample the data to the same timestep frequency of the model
                     if qobs_freq < qsim_freq:
-                        print(f"Resampling the observed data from {qobs_freq} to {qsim_freq}")
+                        print(
+                            f"Resampling the observed data from {qobs_freq} to {qsim_freq}"
+                        )
                         qobs_df = qobs_df.resample(qsim_freq).mean()
                     elif qobs_freq > qsim_freq:
-                        print(f"Resampling the modeled data from {qsim_freq} to {qobs_freq}")
+                        print(
+                            f"Resampling the modeled data from {qsim_freq} to {qobs_freq}"
+                        )
                         qsim_df = qsim_df.resample(qobs_freq).mean()
                     else:
                         print(
@@ -1257,25 +1210,16 @@ def plot_hydrographs(
                         ticker.FuncFormatter(lambda x, p: format(int(x), ","))
                     )
                     # Save the figure
-                    # image_path = os.path.join(
-                    #     root_dir,
-                    #     "data",
-                    #     "2_production",
-                    #     "figures",
-                    #     f"{domain_name}_AppendixA_Figure11_{usgs_site_id}.png",
-                    # )
-
                     image_path = os.path.join(
-                        root_dir,
-                        f"{domain_name}_AppendixA_Figure11_{usgs_site_id}.png"
+                        root_dir, f"{domain_name}_AppendixA_Figure11_{usgs_site_id}.png"
                     )
                     fig.savefig(image_path, bbox_inches="tight")
                     plt.close(fig)
-
                     # Search for the keyword within the document and add the image above it
                     report_document = add_image_to_keyword(
                         report_document, "«AppendixA_Figure11»", image_path
                     )
+                    os.remove(image_path)
             elif len(gage_df) > 1:
                 raise ValueError(
                     "Multiple gages found within the minimum buffer distance of the reference line."
