@@ -10,15 +10,15 @@ import os
 import shutil
 from datetime import datetime
 import zipfile
-from pathlib import Path
 import streamlit as st
 
 # Functions ###################################################################
 
+
 def remove_all_folders(directory):
     """
     Remove all files and folders within a directory
-    
+
     Parameters
     ----------
     directory : str
@@ -33,7 +33,8 @@ def remove_all_folders(directory):
         if os.path.isdir(file_path):
             shutil.rmtree(file_path)
 
-def initialize_session(data_directory: str):
+
+def initialize_session(root_directory: str):
     """
     When app is first opened or browser refreshed reset the session info and
     make required folders
@@ -46,12 +47,18 @@ def initialize_session(data_directory: str):
     -------
     None
     """
+    # Capture the timestamp of the session: year_month_day_hour_minute_second_microsecond
     st.session_state["session_id"] = datetime.now()
+    # Assign the timestamp to a string variable for the session id
     session_id_str = st.session_state["session_id"].strftime("%Y_%b_%d_%H_%M_%S_%f")
-    session_dir = os.path.join(data_directory, "3_session")
-    session_data_dir = os.path.join(session_dir, session_id_str)
+    # Create the session directory and data subfolder per session
+    os.makedirs(
+        os.path.join(root_directory, "session", session_id_str, "data"), exist_ok=True
+    )
+    session_dir = os.path.join(root_directory, "session")
+    session_data_dir = os.path.join(session_dir, session_id_str, "data")
 
-    # delete session data directories older than 1 day
+    # Delete session data directories older than 1 day
     for folder in os.listdir(session_dir):
         folder_path = os.path.join(session_dir, folder)
         if os.path.isdir(folder_path):
@@ -64,24 +71,17 @@ def initialize_session(data_directory: str):
     if not os.path.exists(session_data_dir):
         # parent directory for user session
         os.makedirs(session_data_dir)
-        # output directory
-        os.makedirs(os.path.join(session_data_dir, "output"))
 
     # set session data
-    st.session_state["nys_dot_firm_selector"] = False
-    st.session_state["mn_dot_i94"] = False
     st.session_state["session_id_str"] = session_id_str
     st.session_state["session_data_dir"] = session_data_dir
     st.session_state["selected_method"] = None
-    st.session_state["selected_firm"] = False
     st.session_state["data_acquired"] = False
     st.session_state["request_zip"] = False
-    st.session_state["db_connected"] = False
-    st.session_state["conn"] = None
+    st.session_state["login_success"] = False
 
 
 def compress_directory(data_directory: str, output_zip_file: str):
-    # zf = zipfile.ZipFile(output_zip_file, "a")
     with zipfile.ZipFile(output_zip_file, "a") as zf:
         for dirname, subdirs, files in os.walk(data_directory):
             for filename in files:
@@ -113,4 +113,3 @@ def write_session_parameters(session_state):
         for key in session_state.keys():
             # f.write("%s,%s\n"%(key,my_dict[key]))
             f.write(f"{key},{session_state[key]}\n")
-
