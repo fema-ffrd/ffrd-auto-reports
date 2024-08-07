@@ -8,6 +8,7 @@ import asyncio
 import nest_asyncio
 import geopandas as gpd
 from docx import Document
+import streamlit as st
 
 from hy_river import get_usgs_stations
 from hdf_utils import get_hdf_geom, get_hdf_plan
@@ -18,7 +19,6 @@ from figures import (
     plot_stream_network,
     plot_streamflow_summary,
     plot_nlcd,
-    plot_soil_porosity,
     plot_model_mesh,
     plot_wse_errors,
     plot_wse_ttp,
@@ -70,6 +70,7 @@ and in Jupyter notebooks.
 
 # Functions ###################################################################
 
+
 def clean_report_folder():
     """
     Clean the report folder by deleting all files except for the Template
@@ -110,8 +111,10 @@ async def auto_report(
     nlcd_year: int,
     wse_error_threshold: float,
     num_bins: int,
-    root_dir: str,
-    session: str,
+    nid_parquet_file_path: str,
+    nid_dam_height: int,
+    session_data_dir: str,
+    active_streamlit: bool,
 ):
     """
     Generate the figures for the report
@@ -137,10 +140,15 @@ async def auto_report(
         The threshold for the WSE error
     num_bins : int
         The number of bins for the histogram
-    root_dir : str
-        The root directory
-    session : str
-        The session ID
+    nid_parquet_file_path : str
+        The path to the parquet file containing the backup NID data
+    nid_dam_height : int
+        The dam height threshold for the NID inventory
+    session_data_dir : str
+        The session data directory path
+    active_streamlit : bool
+        If true, print statements will be displayed in the Streamlit app
+        If false, print statements will be displayed in the terminal
 
     Returns
     -------
@@ -148,7 +156,12 @@ async def auto_report(
     """
 
     # Get the HDF data
-    print("Processing for the HDF geometry data...")
+    if active_streamlit:
+        st.write("Step 1 / 12")
+        st.write("Processing for the HDF geometry data...")
+    else:
+        print("Step 1 / 12")
+        print("Processing for the HDF geometry data...")
     (
         perimeter,
         geojson_obj,
@@ -158,30 +171,41 @@ async def auto_report(
     ) = get_hdf_geom(hdf_geom_file_path, input_domain_id)
 
     # Get the HDF plan data
-    print("Processing for the HDF plan data...")
+    if active_streamlit:
+        st.write("Step 2 / 12")
+        st.write("Processing for the HDF plan data...")
+    else:
+        print("Step 2 / 12")
+        print("Processing for the HDF plan data...")
     cell_points, dates = get_hdf_plan(hdf_plan_file_path, input_domain_id)
 
     # Collect all USGS gages located within the perimeter boundary
-    print("Processing for the USGS gages dataset...")
+    if active_streamlit:
+        st.write("Step 3 / 12")
+        st.write("Processing for USGS gage metadata...")
+    else:
+        print("Step 3 / 12")
+        print("Processing for USGS gage metadata...")
     try:
         df_gages_usgs = get_usgs_stations(perimeter, dates)
+        st.success("Complete!")
     except Exception as e:
         """
         403 Client Error: You are being blocked by the USGS API due to too many requests.
-        Blocking access to a service should only occur if the USGS believes that your use 
+        Blocking access to a service should only occur if the USGS believes that your use
         of the service is so excessive that it is seriously impacting others using the service.
 
-        To get unblocked, send us the URL you are using along with the IP using this form. 
-        We may require changes to your query and frequency of use in order to give you access 
+        To get unblocked, send us the URL you are using along with the IP using this form.
+        We may require changes to your query and frequency of use in order to give you access
         to the service again.
 
         Contact USGS: https://answers.usgs.gov/
         """
-        print(f"Error processing the USGS gages dataset: {e}")
+        st.error(f"Error processing the USGS gages dataset: {e}")
         # Create an empty geodataframe if the gages dataset fails to process
         df_gages_usgs = gpd.GeoDataFrame(
-                    [], columns=["x", "y"], geometry=[], crs="EPSG:4326"
-                )
+            [], columns=["x", "y"], geometry=[], crs="EPSG:4326"
+        )
 
     """
     Begin generating the report figures. Each figure will be generated in a separate function.
@@ -190,44 +214,87 @@ async def auto_report(
     """
 
     # Generate the Section 01 Figure 01
+    if active_streamlit:
+        st.write("Step 4 / 12")
+        st.write("Processing for the HUC04 pilot boundary...")
+    else:
+        print("Step 4 / 12")
+        print("Processing for the HUC04 pilot boundary...")
     try:
         report_document = plot_pilot_study_area(
             report_document,
             perimeter,
             stream_frequency_threshold,
             domain_id,
-            root_dir,
+            session_data_dir,
         )
+        st.success("Complete!")
     except Exception as e:
-        print(f"Error generating Section 01 Figure 01: {e}")
+        st.error(f"Error generating figure: {e}")
         report_document = report_document
     # Generate the Section 01 Figure 02
+    if active_streamlit:
+        st.write("Step 5 / 12")
+        st.write("Processing for the DEM dataset...")
+    else:
+        print("Step 5 / 12")
+        print("Processing for the DEM dataset...")
     try:
-        report_document = plot_dem(report_document, perimeter, domain_id, root_dir)
+        report_document = plot_dem(
+            report_document, perimeter, domain_id, session_data_dir
+        )
+        st.success("Complete!")
     except Exception as e:
-        print(f"Error generating Section 01 Figure 02: {e}")
+        st.error(f"Error generating figure: {e}")
         report_document = report_document
     # Generate the Section 04 Figure 03
+    if active_streamlit:
+        st.write("Step 6 / 12")
+        st.write("Processing for the NHD stream network...")
+    else:
+        print("Step 6 / 12")
+        print("Processing for the NHD stream network...")
     try:
         report_document = plot_stream_network(
-            report_document, perimeter, df_gages_usgs, domain_id, root_dir
+            report_document,
+            perimeter,
+            df_gages_usgs,
+            domain_id,
+            nid_parquet_file_path,
+            nid_dam_height,
+            session_data_dir,
+            active_streamlit,
         )
+        st.success("Complete!")
     except Exception as e:
-        print(f"Error generating Section 04 Figure 03: {e}")
+        st.error(f"Error generating figure: {e}")
         report_document = report_document
     # Generate the Section 04 Figure 04
+    if active_streamlit:
+        st.write("Step 7 / 12")
+        st.write("Processing for the streamflow period of record...")
+    else:
+        print("Step 7 / 12")
+        print("Processing for the streamflow period of record...")
     try:
         report_document = plot_streamflow_summary(
             report_document,
             df_gages_usgs,
             dates,
             domain_id,
-            root_dir,
+            session_data_dir,
         )
+        st.success("Complete!")
     except Exception as e:
-        print(f"Error generating Section 04 Figure 04: {e}")
+        st.error(f"Error generating figure: {e}")
         report_document = report_document
     # Generate the Section 04 Figure 05
+    if active_streamlit:
+        st.write("Step 8 / 12")
+        st.write("Processing for the NLCD data...")
+    else:
+        print("Step 8 / 12")
+        print("Processing for the NLCD data...")
     try:
         report_document = plot_nlcd(
             report_document,
@@ -235,23 +302,20 @@ async def auto_report(
             nlcd_resolution,
             nlcd_year,
             domain_id,
-            root_dir,
+            session_data_dir,
+            active_streamlit,
         )
+        st.success("Complete!")
     except Exception as e:
-        print(f"Error generating Section 04 Figure 05: {e}")
-        report_document = report_document
-    # Generate the Section 04 Figure 06
-    try:
-        report_document = plot_soil_porosity(
-            report_document,
-            perimeter,
-            domain_id,
-            root_dir,
-        )
-    except Exception as e:
-        print(f"Error generating Section 04 Figure 06: {e}")
+        st.error(f"Error generating figure: {e}")
         report_document = report_document
     # Generate the Section 04 Figure 07
+    if active_streamlit:
+        st.write("Step 9 / 12")
+        st.write("Processing for the constructed model mesh...")
+    else:
+        print("Step 9 / 12")
+        print("Processing for the constructed model mesh...")
     try:
         report_document = plot_model_mesh(
             report_document,
@@ -259,12 +323,19 @@ async def auto_report(
             breaklines,
             cell_polygons,
             domain_id,
-            root_dir,
+            session_data_dir,
         )
+        st.success("Complete!")
     except Exception as e:
-        print(f"Error generating Section 04 Figure 07: {e}")
+        st.error(f"Error generating figure: {e}")
         report_document = report_document
     # Generate the Appendix A Figure 09
+    if active_streamlit:
+        st.write("Step 10 / 12")
+        st.write("Processing for the max WSE errors...")
+    else:
+        print("Step 10 / 12")
+        print("Processing for the max WSE errors...")
     try:
         report_document = plot_wse_errors(
             report_document,
@@ -272,21 +343,35 @@ async def auto_report(
             wse_error_threshold,
             num_bins,
             domain_id,
-            root_dir,
+            session_data_dir,
         )
+        st.success("Complete!")
     except Exception as e:
-        print(f"Error generating Appendix A Figure 09: {e}")
+        st.error(f"Error generating figure: {e}")
         report_document = report_document
     # Generate the Appendix A Figure 10
+    if active_streamlit:
+        st.write("Step 11 / 12")
+        st.write("Processing for the WSE time to peak...")
+    else:
+        print("Step 11 / 12")
+        print("Processing for the WSE time to peak...")
     try:
         report_document = plot_wse_ttp(
-            report_document, cell_points, num_bins, domain_id, root_dir
+            report_document, cell_points, num_bins, domain_id, session_data_dir
         )
+        st.success("Complete!")
     except Exception as e:
-        print(f"Error generating Appendix A Figure 10: {e}")
+        st.error(f"Error generating figure: {e}")
         report_document = report_document
     if len(df_gages_usgs) > 0:
         # Generate the Appendix A Figure 11
+        if active_streamlit:
+            st.write("Step 12 / 12")
+            st.write("Processing for the calibration hydrographs...")
+        else:
+            print("Step 12 / 12")
+            print("Processing for the calibration hydrographs...")
         try:
             report_document = plot_hydrographs(
                 report_document,
@@ -294,26 +379,28 @@ async def auto_report(
                 df_gages_usgs,
                 dates,
                 domain_id,
-                root_dir,
+                session_data_dir,
+                active_streamlit,
             )
+            st.success("Complete!")
         except Exception as e:
-            print(f"Error generating Appendix A Figure 11: {e}")
-    # Save the document
+            st.error(f"Error generating figure(s): {e}")
+
+    # Save the report document
     document_path = os.path.join(
-        root_dir,
-        "data",
-        "3_session",
-        session,
+        session_data_dir,
         "FFRD-RAS-Report-Automated-Updated.docx",
     )
+
     if os.path.exists(document_path):
         report_document.save(document_path)
     else:
         os.makedirs(os.path.dirname(document_path), exist_ok=True)
         report_document.save(document_path)
 
-    print("Report Generation Complete!")
+    st.write("Report Generation Complete!")
     return
+
 
 def main_auto_report(
     hdf_geom_file_path: str,
@@ -325,8 +412,10 @@ def main_auto_report(
     nlcd_year: int,
     wse_error_threshold: float,
     num_bins: int,
-    root_dir: str,
-    session: str,
+    nid_parquet_file_path: str,
+    nid_dam_height: int,
+    session_data_dir: str,
+    active_streamlit: bool,
 ):
     """
     Main function to run the auto report
@@ -352,10 +441,15 @@ def main_auto_report(
         The threshold for the WSE error
     num_bins : int
         The number of bins for the histogram
-    root_dir : str
-        The root directory
-    session : str
-        The session ID
+    nid_parquet_file_path : str
+        The path to the parquet file containing the backup NID data
+    nid_dam_height : int
+        The dam height threshold for the NID inventory
+    session_data_dir : str
+        The session data directory path
+    active_streamlit : bool
+        If true, print statements will be displayed in the Streamlit app
+        If false, print statements will be displayed in the terminal
 
     Returns
     -------
@@ -363,20 +457,9 @@ def main_auto_report(
     """
     # Apply the nest_asyncio patch
     nest_asyncio.apply()
-    
-    # # Clean the report folder and copy the template
-    # report_document = clean_report_folder()
-    # template_path = os.path.join(
-    #     root_dir,
-    #     "data",
-    #     "2_production",
-    #     "report",
-    #     "FFRD-RAS-Report-Automated-Template.docx",
-    # )
 
     # Use asyncio.run if not in an already running event loop
     if not asyncio.get_event_loop().is_running():
-        print("Running in a new event loop")
         asyncio.run(
             auto_report(
                 hdf_geom_file_path,
@@ -388,13 +471,14 @@ def main_auto_report(
                 nlcd_year,
                 wse_error_threshold,
                 num_bins,
-                root_dir,
-                session
+                nid_parquet_file_path,
+                nid_dam_height,
+                session_data_dir,
+                active_streamlit,
             )
         )
     else:
         # If already in an event loop, use create_task
-        print("Running in an existing event loop")
         asyncio.create_task(
             auto_report(
                 hdf_geom_file_path,
@@ -406,7 +490,9 @@ def main_auto_report(
                 nlcd_year,
                 wse_error_threshold,
                 num_bins,
-                root_dir,
-                session
+                nid_parquet_file_path,
+                nid_dam_height,
+                session_data_dir,
+                active_streamlit,
             )
         )
