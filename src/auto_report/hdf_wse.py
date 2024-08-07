@@ -181,7 +181,6 @@ def wse_error_qc(
         True if the max WSE errors were processed successfully, False
     """
     # Process Max WSE Errors and export graphics
-    print("Processing Max WSE Errors...")
     if len(cell_points_gdf) == 0:
         print("No cells found in the HDF file")
         return False
@@ -222,7 +221,6 @@ def wse_ttp_qc(cell_points_gdf: gpd.GeoDataFrame, num_bins: int, output_path: st
         True if the time to peak was processed successfully, False otherwise
     """
     # Process WSE time to peak
-    print("Processing WSE Time to Peak...")
     if len(cell_points_gdf) == 0:
         print("No cells found in the HDF file")
         return False
