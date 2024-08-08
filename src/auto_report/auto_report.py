@@ -188,7 +188,6 @@ async def auto_report(
         print("Processing for USGS gage metadata...")
     try:
         df_gages_usgs = get_usgs_stations(perimeter, dates)
-        st.success("Complete!")
     except Exception as e:
         """
         403 Client Error: You are being blocked by the USGS API due to too many requests.
@@ -228,7 +227,6 @@ async def auto_report(
             domain_id,
             session_data_dir,
         )
-        st.success("Complete!")
     except Exception as e:
         st.error(f"Error generating figure: {e}")
         report_document = report_document
@@ -243,7 +241,6 @@ async def auto_report(
         report_document = plot_dem(
             report_document, perimeter, domain_id, session_data_dir
         )
-        st.success("Complete!")
     except Exception as e:
         st.error(f"Error generating figure: {e}")
         report_document = report_document
@@ -265,7 +262,6 @@ async def auto_report(
             session_data_dir,
             active_streamlit,
         )
-        st.success("Complete!")
     except Exception as e:
         st.error(f"Error generating figure: {e}")
         report_document = report_document
@@ -284,7 +280,6 @@ async def auto_report(
             domain_id,
             session_data_dir,
         )
-        st.success("Complete!")
     except Exception as e:
         st.error(f"Error generating figure: {e}")
         report_document = report_document
@@ -305,7 +300,6 @@ async def auto_report(
             session_data_dir,
             active_streamlit,
         )
-        st.success("Complete!")
     except Exception as e:
         st.error(f"Error generating figure: {e}")
         report_document = report_document
@@ -325,7 +319,6 @@ async def auto_report(
             domain_id,
             session_data_dir,
         )
-        st.success("Complete!")
     except Exception as e:
         st.error(f"Error generating figure: {e}")
         report_document = report_document
@@ -345,7 +338,6 @@ async def auto_report(
             domain_id,
             session_data_dir,
         )
-        st.success("Complete!")
     except Exception as e:
         st.error(f"Error generating figure: {e}")
         report_document = report_document
@@ -360,7 +352,6 @@ async def auto_report(
         report_document = plot_wse_ttp(
             report_document, cell_points, num_bins, domain_id, session_data_dir
         )
-        st.success("Complete!")
     except Exception as e:
         st.error(f"Error generating figure: {e}")
         report_document = report_document
@@ -382,7 +373,6 @@ async def auto_report(
                 session_data_dir,
                 active_streamlit,
             )
-            st.success("Complete!")
         except Exception as e:
             st.error(f"Error generating figure(s): {e}")
 
