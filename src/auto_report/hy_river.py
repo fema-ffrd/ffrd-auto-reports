@@ -229,7 +229,7 @@ def get_nlcd_data(model_perimeter: gpd.GeoDataFrame, resolution: int, year: int)
         The NLCD data within the model perimeter
     """
     # First test if the NLCD server is available
-    url = "https://www.mrlc.gov/geoserver/mrlc_display/NLCD_2001_2021_Land_Cover_Change_Index_L48/wms?"
+    url = f"https://www.mrlc.gov/geoserver/mrlc_display/NLCD_{year}_Land_Cover_L48/wms?"
     response = requests.get(url)
 
     if response.status_code != 200:
