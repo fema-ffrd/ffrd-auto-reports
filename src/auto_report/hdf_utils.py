@@ -222,6 +222,7 @@ def get_hdf_geom(hdf_file_path: str, input_domain_id: str):
         domain_id,
         cell_polygons,
         breaklines,
+        proj_table,
     )
 
 
