@@ -90,11 +90,11 @@ if __name__ == "__main__":
         else:
             GEOM_HDF_PATH = st.text_input(
                 "Geometry HDF File",
-                "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/EaFT-Lavon/Model/EaFT_Lavon.g06.hdf",
+                "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/Denton/Trinity_1203_Denton/Trinity_1203_Denton.g01.hdf",
             )
             PLAN_HDF_PATH = st.text_input(
                 "Plan HDF File",
-                "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/EaFT-Lavon/Model/EaFT_Lavon.p01.hdf",
+                "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/Denton/Trinity_1203_Denton/Trinity_1203_Denton.p03.hdf",
             )
 
     # Particles.js animation
@@ -148,12 +148,11 @@ if __name__ == "__main__":
         st.write("Click the button below to run the report.")
         if st.button("Begin Report Generation"):
             if GEOM_HDF_PATH is not None and PLAN_HDF_PATH is not None:
-                report_document = Document(report_file)
                 try:
                     main_auto_report(
                         GEOM_HDF_PATH,
                         PLAN_HDF_PATH,
-                        report_document,
+                        report_file,
                         DOMAIN_ID,
                         STREAM_THRESHOLD,
                         NLCD_RES,
