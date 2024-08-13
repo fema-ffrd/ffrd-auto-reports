@@ -62,9 +62,12 @@ def initialize_session(root_directory: str):
     for folder in os.listdir(session_dir):
         folder_path = os.path.join(session_dir, folder)
         if os.path.isdir(folder_path):
-            folder_date = datetime.strptime(folder, "%Y_%b_%d_%H_%M_%S_%f")
-            if (datetime.now() - folder_date).days > 1:
-                print(f"Deleting old session data directory: {folder}")
+            if folder != 'test':
+              folder_date = datetime.strptime(folder, "%Y_%b_%d_%H_%M_%S_%f")
+              if (datetime.now() - folder_date).days > 1:
+                  print(f"Deleting old session data directory: {folder}")
+                  shutil.rmtree(folder_path)
+            else:
                 shutil.rmtree(folder_path)
 
     # if session data directory does not exist, create it
