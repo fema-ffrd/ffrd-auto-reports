@@ -225,12 +225,12 @@ def plot_pilot_study_area(
         ax=ax, crs=model_perimeter.crs, source=ctx.providers.OpenStreetMap.Mapnik
     )
 
-    image_path = os.path.join(root_dir, f"{domain_name}_Section01_Figure01.png")
+    image_path = os.path.join(root_dir, f"{domain_name}_figure_pilot_study_area.png")
     fig.savefig(image_path, bbox_inches="tight")
     plt.close(fig)
     # Search for the figure keyword within the document and add the image above it
     report_document = add_image_to_keyword(
-        report_document, "«Section01_Figure01»", image_path
+        report_document, "«figure_pilot_study_area»", image_path
     )
     os.remove(image_path)
     # Update the report text
@@ -238,7 +238,7 @@ def plot_pilot_study_area(
     report_keywords['Model_Unit_Name'] = basin_name
     report_keywords['Header_Main'] = f"{pilot_name} / {basin_name}"
     report_keywords['Header_01'] = f"{pilot_name} / {basin_name}"
-    report_keywords['Section01_Figure01'] = f"{pilot_name} Basin Overview with {basin_name} Modeling Unit in red color"
+    report_keywords['figure_pilot_study_area'] = f"{pilot_name} Basin Overview with {basin_name} Modeling Unit"
 
     return report_document, report_keywords
 
@@ -294,17 +294,17 @@ def plot_dem(
             ax, crs=model_perimeter.crs, source=ctx.providers.OpenStreetMap.Mapnik
         )
         # Save the figure
-        image_path = os.path.join(root_dir, f"{domain_name}_Section01_Figure02.png")
+        image_path = os.path.join(root_dir, f"{domain_name}_figure_dem.png")
         fig.savefig(image_path, bbox_inches="tight")
         plt.close(fig)
         # Search for the keyword within the document and add the image above it
         report_document = add_image_to_keyword(
-            report_document, "«Section01_Figure02»", image_path
+            report_document, "«figure_dem»", image_path
         )
         os.remove(image_path)
         # Update the report text
         basin_name = report_keywords['Model_Unit_Name']
-        report_keywords['Section01_Figure02'] = f"{basin_name} Digital Elevation Model (DEM)"
+        report_keywords['figure_dem'] = f"{basin_name} Digital Elevation Model (DEM)"
         return report_document, report_keywords
     else:
         # Convert units from m to ft
@@ -328,17 +328,17 @@ def plot_dem(
         # Set the colorbar label
         cbar.set_label("Elevation (ft)")
         # Save the figure
-        image_path = os.path.join(root_dir, f"{domain_name}_Section01_Figure02.png")
+        image_path = os.path.join(root_dir, f"{domain_name}_figure_dem.png")
         fig.savefig(image_path, bbox_inches="tight")
         plt.close(fig)
         # Search for the keyword within the document and add the image above it
         report_document = add_image_to_keyword(
-            report_document, "«Section01_Figure02»", image_path
+            report_document, "«figure_dem»", image_path
         )
         os.remove(image_path)
         # Update the report text
         basin_name = report_keywords['Model_Unit_Name']
-        report_keywords['Section01_Figure02'] = f"{basin_name} Digital Elevation Model (DEM)"
+        report_keywords['figure_dem'] = f"{basin_name} Digital Elevation Model (DEM)"
         return report_document, report_keywords
 
 
@@ -457,16 +457,16 @@ def plot_stream_network(
     )
 
     # Save the figure
-    image_path = os.path.join(root_dir, f"{domain_name}_Section04_Figure03.png")
+    image_path = os.path.join(root_dir, f"{domain_name}_figure_basin_datasets.png")
     fig.savefig(image_path, bbox_inches="tight")
     plt.close(fig)
     # Search for the keyword within the document and add the image above it
     report_document = add_image_to_keyword(
-        report_document, "«Section04_Figure03»", image_path
+        report_document, "«figure_basin_datasets»", image_path
     )
     os.remove(image_path)
     # Update the report text
-    report_keywords['Section04_Figure03'] = f"Model Perimeter with NHD Streams, NID Dams, and USGS Gages"
+    report_keywords['figure_basin_datasets'] = f"Model Perimeter with NHD Streams, NID Dams, and USGS Gages"
     return report_document, report_keywords
 
 
@@ -519,14 +519,34 @@ def plot_streamflow_summary(
             station_df = pd.DataFrame(qobs_ds.station_id.values, columns=["station_id"])
             # Loop through each station
             for idx, row in station_df.iterrows():
-                # Station name and ID
-                station = row["station_id"]
-                station_name = qobs_ds.station_nm.values[idx]
+                # Station name, ID, and drainage area
+                station = row["station_id"] # USGS-08059590
+                # Strip the USGS prefix from the station ID
+                station_id = station.split("-")[-1] # 08059590
+                station_name = qobs_ds.station_nm.values[idx] # Willow Creek at Highway 80
+                try:
+                    site_info = nwis.get_info({"site": station_id}, expanded=True)
+                    drainage_area = site_info["drain_area_va"].values[0] # square miles
+                except Exception as e:
+                    print(f"Error retrieving site info for {station_id}: {e}")
+                    report_keywords[f'table03_gage0{idx+1}_name'] = "Data Unavailable"
+                    report_keywords[f'table03_gage0{idx+1}_id'] = "Data Unavailable"
+                    report_keywords[f'table03_gage0{idx+1}_area'] = "Data Unavailable"
+                    report_keywords[f'table03_gage0{idx+1}_por'] = "Data Unavailable"
+                    continue
+
                 print(f"Processing station {station} {station_name}")
                 # Period of Record dates
                 por_start = qobs_ds.begin_date.values[idx]
+                por_start_year = pd.to_datetime(por_start).year
                 por_end = qobs_ds.end_date.values[idx]
+                por_end_year = pd.to_datetime(por_end).year
                 por_dates = (por_start, por_end)
+                # Update the report text
+                report_keywords[f'table03_gage0{idx+1}_name'] = station_name
+                report_keywords[f'table03_gage0{idx+1}_id'] = station_id
+                report_keywords[f'table03_gage0{idx+1}_area'] = f"{drainage_area:,}"
+                report_keywords[f'table03_gage0{idx+1}_por'] = f"{por_start_year}-{por_end_year}"
                 # Period of Record streamflow data
                 qpor_df_daily = nwis.get_streamflow(station, por_dates, mmd=False)
                 qpor_df_daily = qpor_df_daily * 35.3147  # Convert from cms to cfs
@@ -637,17 +657,17 @@ def plot_streamflow_summary(
 
                 # Save the figure
                 image_path = os.path.join(
-                    root_dir, f"{domain_name}_Section04_Figure04_{station}.png"
+                    root_dir, f"{domain_name}_figure_stream_gage_summary_{station}.png"
                 )
                 fig.savefig(image_path, bbox_inches="tight")
                 plt.close(fig)
                 # Search for the keyword within the document and add the image above it
                 report_document = add_image_to_keyword(
-                    report_document, "«Section04_Figure04»", image_path
+                    report_document, "«figure_stream_gage_summary»", image_path
                 )
                 os.remove(image_path)
             # Update the report text
-            report_keywords['Section04_Figure04'] = "USGS Gage Streamflow Summary Analytics"
+            report_keywords['figure_stream_gage_summary'] = "USGS Gage Streamflow Summary Analytics"
             return report_document, report_keywords
         else:
             print("No USGS stations in the watershed with daily values")
@@ -705,6 +725,7 @@ def plot_nlcd(
             st.error(f"Error generating figure: {nlcd}")
         else:
             print(f"Error generating figure: {nlcd}")
+            report_keywords['figure_nlcd'] = f"Error generating figure: {nlcd}"
         return report_document, report_keywords
     else:
         # Collect the NLCD class names for each ID
@@ -743,16 +764,16 @@ def plot_nlcd(
             ax, crs=model_perimeter.crs, source=ctx.providers.OpenStreetMap.Mapnik
         )
         # Save the figure
-        image_path = os.path.join(root_dir, f"{domain_name}_Section04_Figure05.png")
+        image_path = os.path.join(root_dir, f"{domain_name}_figure_nlcd.png")
         fig.savefig(image_path, bbox_inches="tight")
         plt.close(fig)
         # Search for the keyword within the document and add the image above it
         report_document = add_image_to_keyword(
-            report_document, "«Section04_Figure05»", image_path
+            report_document, "«figure_nlcd»", image_path
         )
         os.remove(image_path)
         # Update the report text
-        report_keywords['Section04_Figure05'] = f"NLCD {nlcd_year} Land Cover Usage"
+        report_keywords['figure_nlcd'] = f"NLCD {nlcd_year} Land Cover Usage"
         return report_document, report_keywords
 
 
@@ -821,16 +842,16 @@ def plot_soil_porosity(
         ax, crs=model_perimeter.crs, source=ctx.providers.OpenStreetMap.Mapnik
     )
     # Save the figure
-    image_path = os.path.join(root_dir, f"{domain_name}_Section04_Figure06.png")
+    image_path = os.path.join(root_dir, f"{domain_name}_figure_soils.png")
     fig.savefig(image_path, bbox_inches="tight")
     plt.close(fig)
     # Search for the keyword within the document and add the image above it
     report_document = add_image_to_keyword(
-        report_document, "«Section04_Figure06»", image_path
+        report_document, "«figure_soils»", image_path
     )
     os.remove(image_path)
     # Update the report text
-    report_keywords['Section04_Figure06'] = "Soil Porosity (inches/ft) within 1 ft of the soil profile"
+    report_keywords['figure_soils'] = "Soil Porosity (inches/ft) within 1 ft of the soil profile"
     return report_document, report_keywords
 
 
@@ -908,16 +929,16 @@ def plot_model_mesh(
     ax.set_xlabel("Longitude")
     ax.set_ylabel("Latitude")
     # Save the figure
-    image_path = os.path.join(root_dir, f"{domain_name}_Section04_Figure07.png")
+    image_path = os.path.join(root_dir, f"{domain_name}_figure_model_mesh.png")
     fig.savefig(image_path, bbox_inches="tight")
     plt.close(fig)
     # Search for the keyword within the document and add the image above it
     report_document = add_image_to_keyword(
-        report_document, "«Section04_Figure07»", image_path
+        report_document, "«figure_model_mesh»", image_path
     )
     os.remove(image_path)
     # Update the report text
-    report_keywords['Section04_Figure07'] = "Final Constructed Mesh Geometry of the Model"
+    report_keywords['figure_model_mesh'] = "Final Constructed Mesh Geometry of the Model"
     return report_document, report_keywords
 
 def calc_wse_stats(df: pd.DataFrame, target_column: str):
@@ -1093,16 +1114,16 @@ def plot_wse_errors(
     """
 
     # Generate the Figure for the WSE Error QC
-    image_path = os.path.join(root_dir, f"{domain_name}_AppendixA_Figure09.png")
+    image_path = os.path.join(root_dir, f"{domain_name}_figure_wse_errors.png")
 
     # Process Max WSE Errors and export graphics
     if len(cell_points) == 0:
         print("No cells found in the HDF file")
-        report_keywords['AppendixA_Figure09'] = "No cells found in the HDF file"
+        report_keywords['figure_wse_errors'] = "No cells found in the HDF file"
         return report_document, report_keywords
     elif len(cell_points[cell_points["max_ws_err"] > 0]) == 0:
         print("No cells with WSE errors greater than zero")
-        report_keywords['AppendixA_Figure09'] = "No cells with WSE errors greater than zero"
+        report_keywords['figure_wse_errors'] = "No cells with WSE errors greater than zero"
         return report_document, report_keywords
     else:
         # Calculate the frequency, PDF, and CDF of the max WSE errors
@@ -1122,11 +1143,11 @@ def plot_wse_errors(
         )
         # Search for the keyword within the document and add the image above it
         report_document = add_image_to_keyword(
-            report_document, "«AppendixA_Figure09»", image_path
+            report_document, "«figure_wse_errors»", image_path
         )
         os.remove(image_path)
         # Update the report text
-        report_keywords['AppendixA_Figure09'] = f"""Maximum Water Surface Elevation Error Spatial Distribution. Among the {num_cells:,} wetted cells, approximately {num_cells_exceeding_threshold:,} cells have errors exceeding a threshold of {wse_error_threshold:.2f}-feet, with a maximum recorded error of {max_wse_error:.1f}-feet.
+        report_keywords['figure_wse_errors'] = f"""Maximum Water Surface Elevation Error Spatial Distribution. Among the {num_cells:,} wetted cells, approximately {num_cells_exceeding_threshold:,} cells have errors exceeding a threshold of {wse_error_threshold:.2f}-feet, with a maximum recorded error of {max_wse_error:.1f}-feet.
         """
         return report_document, report_keywords
 
@@ -1167,12 +1188,12 @@ def plot_wse_ttp(
     """
 
     # Generate the Figure for the WSE Error QC
-    image_path = os.path.join(root_dir, f"{domain_name}_AppendixA_Figure10.png")
+    image_path = os.path.join(root_dir, f"{domain_name}_figure_wse_ttp.png")
 
     # Process WSE time to peak
     if len(cell_points) == 0:
         print("No cells found in the HDF file")
-        report_keywords['AppendixA_Figure10'] = "No cells found in the HDF file"
+        report_keywords['figure_wse_ttp'] = "No cells found in the HDF file"
         return report_document, report_keywords
 
     # Determine the global min time to peak for the simulation start time
@@ -1186,7 +1207,7 @@ def plot_wse_ttp(
 
     if len(ttp[ttp["ttp_hrs"] > 0]) == 0:
         print("No cells with time to peak greater than zero")
-        report_keywords['AppendixA_Figure10'] = "No cells with time to peak greater than zero"
+        report_keywords['figure_wse_ttp'] = "No cells with time to peak greater than zero"
         return report_document, report_keywords
     else:
         # Define the global max time to peak
@@ -1208,11 +1229,11 @@ def plot_wse_ttp(
         )
         # Search for the keyword within the document and add the image above it
         report_document = add_image_to_keyword(
-            report_document, "«AppendixA_Figure10»", image_path
+            report_document, "«figure_wse_ttp»", image_path
         )
         os.remove(image_path)
         # Update the report text
-        report_keywords['AppendixA_Figure10'] = f"""Water Surface Elevation Time-to-Peak Spatial Distribution. The full duration for the model simulation is {ttp_max:.0f} hours. Among the {num_cells:,} wetted cells, at least {num_cells_exceeding_threshold:,} was still increasing in water surface elevation during the final hour of the simulation.
+        report_keywords['figure_wse_ttp'] = f"""Water Surface Elevation Time-to-Peak Spatial Distribution. The full duration for the model simulation is {ttp_max:.0f} hours. Among the {num_cells:,} wetted cells, at least {num_cells_exceeding_threshold:,} was still increasing in water surface elevation during the final hour of the simulation.
         """
         return report_document, report_keywords
 
@@ -1251,8 +1272,7 @@ def plot_hydrographs(
     active_streamlit: bool,
 ):
     """
-    Generate the Appendix A Figure 11 for the report
-    Gage calibration plots
+    Generate the gage hydrograph calibration plots
 
     Parameters
     ----------
@@ -1284,22 +1304,18 @@ def plot_hydrographs(
     print(f"Calibration period: {dates[0]} to {dates[1]}")
     # Open the HDF plan file for the reference line data
     plan_hdf = RasPlanHdf.open_uri(hdf_plan_file_path)
-    print("Stepping through the reference lines")
     ref_lines = plan_hdf.reference_lines()
-    print("Converting the reference lines to EPSG:4326")
     ref_lines = ref_lines.to_crs(epsg=4326)  # convert to EPSG:4326
-    print("Extracting the reference line timeseries data")
     ref_lines_ds = plan_hdf.reference_lines_timeseries_output()
 
     # Query the NWIS server for streamflow at the gage locations
-    print("Querying NWIS for streamflow data")
     qobs_ds = get_nwis_streamflow(df_gages_usgs, dates)
     if isinstance(qobs_ds, str):
         if active_streamlit:
             st.error(f"Error generating figure: {qobs_ds}")
         else:
             print(f"Error generating figure: {qobs_ds}")
-        report_keywords['AppendixA_Figure11'] = f"Error generating figure: {qobs_ds}"
+        report_keywords['figure_gage_cal'] = f"Error generating figure: {qobs_ds}"
         return report_document, report_keywords
 
     # Units of degrees for EPSG:4326 to buffer outwards from the reference line location
@@ -1382,13 +1398,13 @@ def plot_hydrographs(
                 )
                 # Save the figure
                 image_path = os.path.join(
-                    root_dir, f"{domain_name}_AppendixA_Figure11_{usgs_site_id}.png"
+                    root_dir, f"{domain_name}_figure_gage_cal_{usgs_site_id}.png"
                 )
                 fig.savefig(image_path, bbox_inches="tight")
                 plt.close(fig)
                 # Search for the keyword within the document and add the image above it
                 report_document = add_image_to_keyword(
-                    report_document, "«AppendixA_Figure11»", image_path
+                    report_document, "«figure_gage_cal»", image_path
                 )
                 os.remove(image_path)
         # Non-trivial scenario: no rows returned indicating no gages are within the buffer distance
@@ -1481,13 +1497,13 @@ def plot_hydrographs(
                     )
                     # Save the figure
                     image_path = os.path.join(
-                        root_dir, f"{domain_name}_AppendixA_Figure11_{usgs_site_id}.png"
+                        root_dir, f"{domain_name}_figure_gage_cal_{usgs_site_id}.png"
                     )
                     fig.savefig(image_path, bbox_inches="tight")
                     plt.close(fig)
                     # Search for the keyword within the document and add the image above it
                     report_document = add_image_to_keyword(
-                        report_document, "«AppendixA_Figure11»", image_path
+                        report_document, "«figure_gage_cal»", image_path
                     )
                     os.remove(image_path)
             elif len(gage_df) > 1:
@@ -1495,5 +1511,5 @@ def plot_hydrographs(
                     "Multiple gages found within the minimum buffer distance of the reference line."
                 )
     # Update the report text
-    report_keywords['AppendixA_Figure11'] = "USGS Gage Calibration Plots"
+    report_keywords['figure_gage_cal'] = "USGS Gage Calibration Plots"
     return report_document, report_keywords
