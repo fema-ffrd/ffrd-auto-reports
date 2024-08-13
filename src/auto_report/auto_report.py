@@ -186,7 +186,18 @@ async def auto_report(
         domain_id,
         cell_polygons,
         breaklines,
+        proj_table,
     ) = get_hdf_geom(hdf_geom_file_path, input_domain_id)
+
+    # Update Table 1: Projection Details
+    report_keywords['table01_projcs'] = proj_table['projcs']
+    report_keywords['table01_geogcs'] = proj_table['geogcs']
+    report_keywords['table01_datum'] = proj_table['datum']
+    report_keywords['table01_ellipsoid'] = proj_table['ellipsoid']
+    report_keywords['table01_method'] = proj_table['method']
+    report_keywords['table01_authority'] = proj_table['authority']
+    report_keywords['table01_code'] = str(proj_table['code'])
+    report_keywords['table01_unit'] = proj_table['unit']
 
     # Get the HDF plan data
     if active_streamlit:
@@ -236,7 +247,7 @@ async def auto_report(
     the remaining figures starting with the proceeding figure.
     """
 
-    # Generate the Section 01 Figure 01
+    # Generate the pilot study area figure
     if active_streamlit:
         st.write("Step 4 / 12")
         st.write("Processing for the HUC04 pilot boundary...")
@@ -256,175 +267,175 @@ async def auto_report(
         st.error(f"Error generating figure: {e}")
         report_document = report_document
         report_keywords = report_keywords
-    # Generate the Section 01 Figure 02
-    if active_streamlit:
-        st.write("Step 5 / 12")
-        st.write("Processing for the DEM dataset...")
-    else:
-        print("Step 5 / 12")
-        print("Processing for the DEM dataset...")
-    try:
-        report_document, report_keywords = plot_dem(
-            report_document,
-            report_keywords,
-            perimeter,
-            domain_id,
-            session_data_dir
-        )
-    except Exception as e:
-        st.error(f"Error generating figure: {e}")
-        report_document = report_document
-        report_keywords = report_keywords
-    # Generate the Section 04 Figure 03
-    if active_streamlit:
-        st.write("Step 6 / 12")
-        st.write("Processing for the NHD stream network...")
-    else:
-        print("Step 6 / 12")
-        print("Processing for the NHD stream network...")
-    try:
-        report_document, report_keywords = plot_stream_network(
-            report_document,
-            report_keywords,
-            perimeter,
-            df_gages_usgs,
-            domain_id,
-            nid_parquet_file_path,
-            nid_dam_height,
-            session_data_dir,
-            active_streamlit,
-        )
-    except Exception as e:
-        st.error(f"Error generating figure: {e}")
-        report_document = report_document
-        report_keywords = report_keywords
-    # Generate the Section 04 Figure 04
+    # # Generate the basin DEM figure
+    # if active_streamlit:
+    #     st.write("Step 5 / 12")
+    #     st.write("Processing for the DEM dataset...")
+    # else:
+    #     print("Step 5 / 12")
+    #     print("Processing for the DEM dataset...")
+    # try:
+    #     report_document, report_keywords = plot_dem(
+    #         report_document,
+    #         report_keywords,
+    #         perimeter,
+    #         domain_id,
+    #         session_data_dir
+    #     )
+    # except Exception as e:
+    #     st.error(f"Error generating figure: {e}")
+    #     report_document = report_document
+    #     report_keywords = report_keywords
+    # # Generate the basin stream network figure
+    # if active_streamlit:
+    #     st.write("Step 6 / 12")
+    #     st.write("Processing for the NHD stream network...")
+    # else:
+    #     print("Step 6 / 12")
+    #     print("Processing for the NHD stream network...")
+    # try:
+    #     report_document, report_keywords = plot_stream_network(
+    #         report_document,
+    #         report_keywords,
+    #         perimeter,
+    #         df_gages_usgs,
+    #         domain_id,
+    #         nid_parquet_file_path,
+    #         nid_dam_height,
+    #         session_data_dir,
+    #         active_streamlit,
+    #     )
+    # except Exception as e:
+    #     st.error(f"Error generating figure: {e}")
+    #     report_document = report_document
+    #     report_keywords = report_keywords
+    # Generate the streamflow period of record summary figure(s)
     if active_streamlit:
         st.write("Step 7 / 12")
         st.write("Processing for the streamflow period of record...")
     else:
         print("Step 7 / 12")
         print("Processing for the streamflow period of record...")
-    try:
-        report_document, report_keywords = plot_streamflow_summary(
-            report_document,
-            report_keywords,
-            df_gages_usgs,
-            dates,
-            domain_id,
-            session_data_dir,
-        )
-    except Exception as e:
-        st.error(f"Error generating figure: {e}")
-        report_document = report_document
-        report_keywords = report_keywords
-    # Generate the Section 04 Figure 05
-    if active_streamlit:
-        st.write("Step 8 / 12")
-        st.write("Processing for the NLCD data...")
-    else:
-        print("Step 8 / 12")
-        print("Processing for the NLCD data...")
-    try:
-        report_document, report_keywords = plot_nlcd(
-            report_document,
-            report_keywords,
-            perimeter,
-            nlcd_resolution,
-            nlcd_year,
-            domain_id,
-            session_data_dir,
-            active_streamlit,
-        )
-    except Exception as e:
-        st.error(f"Error generating figure: {e}")
-        report_document = report_document
-        report_keywords = report_keywords
-    # Generate the Section 04 Figure 07
-    if active_streamlit:
-        st.write("Step 9 / 12")
-        st.write("Processing for the constructed model mesh...")
-    else:
-        print("Step 9 / 12")
-        print("Processing for the constructed model mesh...")
-    try:
-        report_document, report_keywords = plot_model_mesh(
-            report_document,
-            report_keywords,
-            perimeter,
-            breaklines,
-            cell_polygons,
-            domain_id,
-            session_data_dir,
-        )
-    except Exception as e:
-        st.error(f"Error generating figure: {e}")
-        report_document = report_document
-        report_keywords = report_keywords
-    # Generate the Appendix A Figure 09
-    if active_streamlit:
-        st.write("Step 10 / 12")
-        st.write("Processing for the max WSE errors...")
-    else:
-        print("Step 10 / 12")
-        print("Processing for the max WSE errors...")
-    try:
-        report_document, report_keywords = plot_wse_errors(
-            report_document,
-            report_keywords,
-            cell_points,
-            wse_error_threshold,
-            num_bins,
-            domain_id,
-            session_data_dir,
-        )
-    except Exception as e:
-        st.error(f"Error generating figure: {e}")
-        report_document = report_document
-        report_keywords = report_keywords
-    # Generate the Appendix A Figure 10
-    if active_streamlit:
-        st.write("Step 11 / 12")
-        st.write("Processing for the WSE time to peak...")
-    else:
-        print("Step 11 / 12")
-        print("Processing for the WSE time to peak...")
-    try:
-        report_document, report_keywords = plot_wse_ttp(
-            report_document,
-            report_keywords,
-            cell_points,
-            num_bins,
-            domain_id,
-            session_data_dir
-        )
-    except Exception as e:
-        st.error(f"Error generating figure: {e}")
-        report_document = report_document
-        report_keywords = report_keywords
+    # try:
+    report_document, report_keywords = plot_streamflow_summary(
+        report_document,
+        report_keywords,
+        df_gages_usgs,
+        dates,
+        domain_id,
+        session_data_dir,
+    )
+    # except Exception as e:
+    #     st.error(f"Error generating figure: {e}")
+    #     report_document = report_document
+    #     report_keywords = report_keywords
+    # # Generate the NLCD figure
+    # if active_streamlit:
+    #     st.write("Step 8 / 12")
+    #     st.write("Processing for the NLCD data...")
+    # else:
+    #     print("Step 8 / 12")
+    #     print("Processing for the NLCD data...")
+    # try:
+    #     report_document, report_keywords = plot_nlcd(
+    #         report_document,
+    #         report_keywords,
+    #         perimeter,
+    #         nlcd_resolution,
+    #         nlcd_year,
+    #         domain_id,
+    #         session_data_dir,
+    #         active_streamlit,
+    #     )
+    # except Exception as e:
+    #     st.error(f"Error generating figure: {e}")
+    #     report_document = report_document
+    #     report_keywords = report_keywords
+    # # Generate the model mesh figure
+    # if active_streamlit:
+    #     st.write("Step 9 / 12")
+    #     st.write("Processing for the constructed model mesh...")
+    # else:
+    #     print("Step 9 / 12")
+    #     print("Processing for the constructed model mesh...")
+    # try:
+    #     report_document, report_keywords = plot_model_mesh(
+    #         report_document,
+    #         report_keywords,
+    #         perimeter,
+    #         breaklines,
+    #         cell_polygons,
+    #         domain_id,
+    #         session_data_dir,
+    #     )
+    # except Exception as e:
+    #     st.error(f"Error generating figure: {e}")
+    #     report_document = report_document
+    #     report_keywords = report_keywords
+    # # Generate the max WSE errors figure
+    # if active_streamlit:
+    #     st.write("Step 10 / 12")
+    #     st.write("Processing for the max WSE errors...")
+    # else:
+    #     print("Step 10 / 12")
+    #     print("Processing for the max WSE errors...")
+    # try:
+    #     report_document, report_keywords = plot_wse_errors(
+    #         report_document,
+    #         report_keywords,
+    #         cell_points,
+    #         wse_error_threshold,
+    #         num_bins,
+    #         domain_id,
+    #         session_data_dir,
+    #     )
+    # except Exception as e:
+    #     st.error(f"Error generating figure: {e}")
+    #     report_document = report_document
+    #     report_keywords = report_keywords
+    # # Generate the WSE time to peak figure
+    # if active_streamlit:
+    #     st.write("Step 11 / 12")
+    #     st.write("Processing for the WSE time to peak...")
+    # else:
+    #     print("Step 11 / 12")
+    #     print("Processing for the WSE time to peak...")
+    # try:
+    #     report_document, report_keywords = plot_wse_ttp(
+    #         report_document,
+    #         report_keywords,
+    #         cell_points,
+    #         num_bins,
+    #         domain_id,
+    #         session_data_dir
+    #     )
+    # except Exception as e:
+    #     st.error(f"Error generating figure: {e}")
+    #     report_document = report_document
+    #     report_keywords = report_keywords
     if len(df_gages_usgs) > 0:
-        # Generate the Appendix A Figure 11
+        # Generate the calibration hydrograph figure(s)
         if active_streamlit:
             st.write("Step 12 / 12")
             st.write("Processing for the calibration hydrographs...")
         else:
             print("Step 12 / 12")
             print("Processing for the calibration hydrographs...")
-        # try:
-        report_document, report_keywords = plot_hydrographs(
-            report_document,
-            report_keywords,
-            hdf_plan_file_path,
-            df_gages_usgs,
-            dates,
-            domain_id,
-            session_data_dir,
-            active_streamlit,
-        )
-        # except Exception as e:
-        #     st.error(f"Error generating figure(s): {e}")
-        #     report_document = report_document
-        #     report_keywords = report_keywords
+        try:
+            report_document, report_keywords = plot_hydrographs(
+                report_document,
+                report_keywords,
+                hdf_plan_file_path,
+                df_gages_usgs,
+                dates,
+                domain_id,
+                session_data_dir,
+                active_streamlit,
+            )
+        except Exception as e:
+            st.error(f"Error generating figure(s): {e}")
+            report_document = report_document
+            report_keywords = report_keywords
     ####################################################################################################
 
     """
