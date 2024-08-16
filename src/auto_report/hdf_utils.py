@@ -28,6 +28,62 @@ def init_s3_keys():
     os.environ["AWS_ACCESS_KEY_ID"] = os.getenv("AWS_ACCESS_KEY_ID")
     os.environ["AWS_SECRET_ACCESS_KEY"] = os.getenv("AWS_SECRET_ACCESS_KEY")
 
+def get_model_perimeter(hdf_file_path: str, input_domain_id: str, project_to_4326: bool):
+    """
+    Get the HDF data
+
+    Parameters
+    ----------
+    hdf_file_path : str
+        The file path to the HDF file
+    input_domain_id : str
+        A user specified domain ID
+    project_to_4326 : bool
+        A flag to project the data to EPSG:4326
+
+    Returns
+    -------
+    perimeter : gpd.GeoDataFrame
+        The perimeter of the mesh
+    """
+    new_crs = "EPSG:4326"
+
+    # Open the HDF file from the S3 bucket
+    if hdf_file_path.startswith("s3://"):
+        # initialize the S3 keys
+        try:
+            init_s3_keys()
+            geom_hdf = RasGeomHdf.open_uri(hdf_file_path)
+        except Exception as e:
+            raise ValueError(
+                f"Error initializing the S3 keys. Check your AWS credentials. {e}"
+            )
+    else:
+        # Open the HDF file from the local file path
+        geom_hdf = RasGeomHdf(hdf_file_path)
+
+    # First get the mesh areas. If this fails, exit the function
+    try:
+        perimeter = geom_hdf.mesh_areas()
+        if project_to_4326:
+            perimeter = perimeter.to_crs(new_crs)
+        else:
+            pass
+    except Exception as e:
+        raise ValueError(f"Error getting the mesh areas: {e}")
+    
+    # Check if there is only one domain
+    domain_id = perimeter["mesh_name"].unique()
+    if len(domain_id) == 1:
+        return perimeter
+    elif len(domain_id) > 1:
+        if input_domain_id not in domain_id:
+            raise ValueError(
+                f"Input Domain ID {input_domain_id} not found in the HDF file. {domain_id}"
+            )
+        else:
+            perimeter = perimeter[perimeter["mesh_name"] == input_domain_id]
+            return perimeter
 
 def get_hdf_plan(hdf_file_path: str, input_domain_id: str):
     """
@@ -86,12 +142,13 @@ def get_hdf_plan(hdf_file_path: str, input_domain_id: str):
             [], columns=["x", "y"], geometry=[], crs="EPSG:4326"
         )
 
-    # Get the simulation start and end times
-    plan_attr = plan_hdf.get_plan_info_attrs()
-    start_time = plan_attr["Simulation Start Time"]
-    end_time = plan_attr["Simulation End Time"]
+    # Get the simulation plan info attributes
+    plan_params = plan_hdf.get_plan_param_attrs()
+    plan_attrs = plan_hdf.get_plan_info_attrs()
+    start_time = plan_attrs["Simulation Start Time"]
+    end_time = plan_attrs["Simulation End Time"]
     dates = (start_time, end_time)
-
+    
     # Convert the CRS to EPSG:4326
     cell_points = cell_points.to_crs(new_crs)
     # Check if there is only one domain
@@ -107,7 +164,7 @@ def get_hdf_plan(hdf_file_path: str, input_domain_id: str):
     else:
         domain_id = domain_id[0]
 
-    return (cell_points, dates)
+    return (cell_points, dates, plan_params, plan_attrs)
 
 
 def get_hdf_geom(hdf_file_path: str, input_domain_id: str):
