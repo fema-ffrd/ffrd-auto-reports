@@ -87,6 +87,9 @@ if __name__ == "__main__":
             PLAN_HDF_PATH = st.file_uploader(
                 "Plan HDF File", type=["hdf"], accept_multiple_files=False
             )
+            NLCD_PATH = st.file_uploader(
+                "NLCD File", type=["tif"], accept_multiple_files=False
+            )
         else:
             GEOM_HDF_PATH = st.text_input(
                 "Geometry HDF File",
@@ -95,6 +98,10 @@ if __name__ == "__main__":
             PLAN_HDF_PATH = st.text_input(
                 "Plan HDF File",
                 "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/Denton/Trinity_1203_Denton/Trinity_1203_Denton.p03.hdf",
+            )
+            NLCD_PATH = st.text_input(
+                "NLCD File",
+                "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/Denton/Trinity_1203_Denton/Reference/LandCover/Denton_LandCover.tif",
             )
 
     # Particles.js animation
@@ -116,12 +123,6 @@ if __name__ == "__main__":
         st.write("National Inventory of Dams (NID) vertical height criteria")
         NID_DAM_HEIGHT = st.number_input("Height (ft)", 30)
         st.write("Spatial resolution of the NLCD data")
-        NLCD_RES = st.number_input("NLCD Resolution", 30)
-        st.write("National Land Cover Database year of coverage")
-        NLCD_YR = st.selectbox("NLCD Year", ["2019", "2021"])
-        st.write(
-            "Threshold of the histogram's x-axis for plotting the water surface elevation errors"
-        )
         WSE_ERROR_THRESHOLD = st.number_input("WSE Error Threshold (ft)", 0.2)
         st.write(
             "Number of bins for the histogram to plot with respect to cells within the model"
@@ -152,11 +153,10 @@ if __name__ == "__main__":
                     main_auto_report(
                         GEOM_HDF_PATH,
                         PLAN_HDF_PATH,
+                        NLCD_PATH,
                         report_file,
                         DOMAIN_ID,
                         STREAM_THRESHOLD,
-                        NLCD_RES,
-                        NLCD_YR,
                         WSE_ERROR_THRESHOLD,
                         NUM_BINS,
                         nid_parquet_file,
