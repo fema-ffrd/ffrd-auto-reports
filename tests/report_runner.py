@@ -17,20 +17,22 @@ if __name__ == "__main__":
     # Example paths to GEOM and PLAN HDF files for the Trinity Pilot Study
 
     # Denton
-    # GEOM_HDF_PATH = "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/Denton/Trinity_1203_Denton/Trinity_1203_Denton.g01.hdf"
-    # PLAN_HDF_PATH = "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/Denton/Trinity_1203_Denton/Trinity_1203_Denton.p03.hdf"
+    GEOM_HDF_PATH = "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/Denton/Trinity_1203_Denton/Trinity_1203_Denton.g01.hdf"
+    PLAN_HDF_PATH = "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/Denton/Trinity_1203_Denton/Trinity_1203_Denton.p03.hdf"
+    NLCD_PATH = "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/Denton/Trinity_1203_Denton/Reference/LandCover/Denton_LandCover.tif"
 
     # EaFT Lavon
     # GEOM_HDF_PATH = "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/EaFT-Lavon/Model/EaFT_Lavon.g06.hdf"
     # PLAN_HDF_PATH = "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/EaFT-Lavon/Model/EaFT_Lavon.p01.hdf"
+    # NLCD_PATH = "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/EaFT-Lavon/Model/Land Classification/NLCD_2021_Trinity_ClipLavon.tif"
 
     # R-Chambers Creek
     # GEOM_HDF_PATH = "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/R-ChambersCr/R-ChambersCr/Trinity_1203_R_Ch_Cr.g01.hdf"
     # PLAN_HDF_PATH = "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/R-ChambersCr/R-ChambersCr/Trinity_1203_R_Ch_Cr.p01.hdf"
 
     # C Mill Creek
-    GEOM_HDF_PATH = "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/C-MillCrk/Model/C_MillCrk_1203_Upper_New/C_MillCrk_1203_Upper_New.g02.hdf"
-    PLAN_HDF_PATH = "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/C-MillCrk/Model/C_MillCrk_1203_Upper_New/C_MillCrk_1203_Upper_New.p03.hdf"
+    # GEOM_HDF_PATH = "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/C-MillCrk/Model/C_MillCrk_1203_Upper_New/C_MillCrk_1203_Upper_New.g02.hdf"
+    # PLAN_HDF_PATH = "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/C-MillCrk/Model/C_MillCrk_1203_Upper_New/C_MillCrk_1203_Upper_New.p03.hdf"
 
     # LT Below Richland
     # GEOM_HDF_PATH = "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/LT-BelowRichlandChambers/Model/LT-BelowRichlandCha.g02.hdf"
@@ -38,8 +40,6 @@ if __name__ == "__main__":
 
     DOMAIN_ID = None  # Optional input for the domain ID. If multiple domains are found, the user must specify a domain ID.
     STREAM_THRESHOLD = 20  # Filter to main streams that occur X times or more within the NHDPlus HR network
-    NLCD_RES = 30  # 30-meter resolution of the NLCD data
-    NLCD_YR = 2019  # 2019 NLCD data
     WSE_ERROR_THRESHOLD = 0.2  # Threshold for the histogram's x-axis
     NUM_BINS = 100  # Number of bins for the histogram
     NID_DAM_HEIGHT = 20  # Dam height threshold for the NID inventory
@@ -54,11 +54,10 @@ if __name__ == "__main__":
     main_auto_report(
         GEOM_HDF_PATH,
         PLAN_HDF_PATH,
+        NLCD_PATH,
         REPORT_PATH,
         DOMAIN_ID,
         STREAM_THRESHOLD,
-        NLCD_RES,
-        NLCD_YR,
         WSE_ERROR_THRESHOLD,
         NUM_BINS,
         NID_PARQUET_PATH,

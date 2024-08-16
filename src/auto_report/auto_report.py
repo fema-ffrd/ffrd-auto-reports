@@ -27,19 +27,6 @@ from figures import (
     plot_hydrographs,
 )
 
-# TODO
-
-
-def Section01_GageSummary_Txt():
-    return
-
-
-def Section02_Table01():
-    return
-
-
-def Section03_Table03():
-    return
 
 def get_report_keywords(report_path: str):
     """
@@ -115,12 +102,11 @@ and in Jupyter notebooks.
 async def auto_report(
     hdf_geom_file_path: str,
     hdf_plan_file_path: str,
+    nlcd_file_path: str,
     report_file_path: str,
     report_keywords: dict,
     input_domain_id: str,
     stream_frequency_threshold: int,
-    nlcd_resolution: int,
-    nlcd_year: int,
     wse_error_threshold: float,
     num_bins: int,
     nid_parquet_file_path: str,
@@ -137,6 +123,8 @@ async def auto_report(
         The path to the geometry HDF file
     hdf_plan_file_path : str
         The path to the plan HDF file
+    nlcd_file_path : str
+        The path to the NLCD file
     report_file_path : str
         The path to the template report file
     report_keywords : dict
@@ -146,10 +134,6 @@ async def auto_report(
     stream_frequency_threshold : int
         The threshold frequency for the stream names. Ex: filter to streams whose
         name occurs 20 times or more within the NHDPlus HR network.
-    nlcd_resolution : int
-        The resolution of the NLCD data to retrieve in meters (30)
-    nlcd_year : int
-        The year of the NLCD data to retrieve (2019)
     wse_error_threshold : float
         The threshold for the WSE error
     num_bins : int
@@ -206,7 +190,16 @@ async def auto_report(
     else:
         print("Step 2 / 12")
         print("Processing for the HDF plan data...")
-    cell_points, dates = get_hdf_plan(hdf_plan_file_path, input_domain_id)
+    cell_points, dates, plan_params, plan_attrs = get_hdf_plan(hdf_plan_file_path, input_domain_id)
+
+    # Update Table 9: 2D Comutational Solver Tolerances and Settings
+    report_keywords['table09_iwf'] = str(plan_params["2D Theta"])
+    report_keywords['table09_wst'] = str(plan_params["2D Water Surface Tolerance"])
+    report_keywords['table09_volt'] = str(plan_params["2D Volume Tolerance"])
+    report_keywords['table09_max_iter'] = str(plan_params["2D Maximum Iterations"])
+    report_keywords['table09_fts'] = plan_attrs["Computation Time Step Base"]
+    report_keywords['table09_eqn'] = plan_params["2D Equation Set"]
+    report_keywords['table09_output_interval'] = plan_attrs["Base Output Interval"]
 
     # Collect all USGS gages located within the perimeter boundary
     if active_streamlit:
@@ -267,48 +260,48 @@ async def auto_report(
         st.error(f"Error generating figure: {e}")
         report_document = report_document
         report_keywords = report_keywords
-    # # Generate the basin DEM figure
-    # if active_streamlit:
-    #     st.write("Step 5 / 12")
-    #     st.write("Processing for the DEM dataset...")
-    # else:
-    #     print("Step 5 / 12")
-    #     print("Processing for the DEM dataset...")
-    # try:
-    #     report_document, report_keywords = plot_dem(
-    #         report_document,
-    #         report_keywords,
-    #         perimeter,
-    #         domain_id,
-    #         session_data_dir
-    #     )
-    # except Exception as e:
-    #     st.error(f"Error generating figure: {e}")
-    #     report_document = report_document
-    #     report_keywords = report_keywords
-    # # Generate the basin stream network figure
-    # if active_streamlit:
-    #     st.write("Step 6 / 12")
-    #     st.write("Processing for the NHD stream network...")
-    # else:
-    #     print("Step 6 / 12")
-    #     print("Processing for the NHD stream network...")
-    # try:
-    #     report_document, report_keywords = plot_stream_network(
-    #         report_document,
-    #         report_keywords,
-    #         perimeter,
-    #         df_gages_usgs,
-    #         domain_id,
-    #         nid_parquet_file_path,
-    #         nid_dam_height,
-    #         session_data_dir,
-    #         active_streamlit,
-    #     )
-    # except Exception as e:
-    #     st.error(f"Error generating figure: {e}")
-    #     report_document = report_document
-    #     report_keywords = report_keywords
+    # Generate the basin DEM figure
+    if active_streamlit:
+        st.write("Step 5 / 12")
+        st.write("Processing for the DEM dataset...")
+    else:
+        print("Step 5 / 12")
+        print("Processing for the DEM dataset...")
+    try:
+        report_document, report_keywords = plot_dem(
+            report_document,
+            report_keywords,
+            perimeter,
+            domain_id,
+            session_data_dir
+        )
+    except Exception as e:
+        st.error(f"Error generating figure: {e}")
+        report_document = report_document
+        report_keywords = report_keywords
+    # Generate the basin stream network figure
+    if active_streamlit:
+        st.write("Step 6 / 12")
+        st.write("Processing for the NHD stream network...")
+    else:
+        print("Step 6 / 12")
+        print("Processing for the NHD stream network...")
+    try:
+        report_document, report_keywords = plot_stream_network(
+            report_document,
+            report_keywords,
+            perimeter,
+            df_gages_usgs,
+            domain_id,
+            nid_parquet_file_path,
+            nid_dam_height,
+            session_data_dir,
+            active_streamlit,
+        )
+    except Exception as e:
+        st.error(f"Error generating figure: {e}")
+        report_document = report_document
+        report_keywords = report_keywords
     # Generate the streamflow period of record summary figure(s)
     if active_streamlit:
         st.write("Step 7 / 12")
@@ -316,103 +309,102 @@ async def auto_report(
     else:
         print("Step 7 / 12")
         print("Processing for the streamflow period of record...")
-    # try:
-    report_document, report_keywords = plot_streamflow_summary(
-        report_document,
-        report_keywords,
-        df_gages_usgs,
-        dates,
-        domain_id,
-        session_data_dir,
-    )
-    # except Exception as e:
-    #     st.error(f"Error generating figure: {e}")
-    #     report_document = report_document
-    #     report_keywords = report_keywords
-    # # Generate the NLCD figure
-    # if active_streamlit:
-    #     st.write("Step 8 / 12")
-    #     st.write("Processing for the NLCD data...")
-    # else:
-    #     print("Step 8 / 12")
-    #     print("Processing for the NLCD data...")
-    # try:
-    #     report_document, report_keywords = plot_nlcd(
-    #         report_document,
-    #         report_keywords,
-    #         perimeter,
-    #         nlcd_resolution,
-    #         nlcd_year,
-    #         domain_id,
-    #         session_data_dir,
-    #         active_streamlit,
-    #     )
-    # except Exception as e:
-    #     st.error(f"Error generating figure: {e}")
-    #     report_document = report_document
-    #     report_keywords = report_keywords
-    # # Generate the model mesh figure
-    # if active_streamlit:
-    #     st.write("Step 9 / 12")
-    #     st.write("Processing for the constructed model mesh...")
-    # else:
-    #     print("Step 9 / 12")
-    #     print("Processing for the constructed model mesh...")
-    # try:
-    #     report_document, report_keywords = plot_model_mesh(
-    #         report_document,
-    #         report_keywords,
-    #         perimeter,
-    #         breaklines,
-    #         cell_polygons,
-    #         domain_id,
-    #         session_data_dir,
-    #     )
-    # except Exception as e:
-    #     st.error(f"Error generating figure: {e}")
-    #     report_document = report_document
-    #     report_keywords = report_keywords
-    # # Generate the max WSE errors figure
-    # if active_streamlit:
-    #     st.write("Step 10 / 12")
-    #     st.write("Processing for the max WSE errors...")
-    # else:
-    #     print("Step 10 / 12")
-    #     print("Processing for the max WSE errors...")
-    # try:
-    #     report_document, report_keywords = plot_wse_errors(
-    #         report_document,
-    #         report_keywords,
-    #         cell_points,
-    #         wse_error_threshold,
-    #         num_bins,
-    #         domain_id,
-    #         session_data_dir,
-    #     )
-    # except Exception as e:
-    #     st.error(f"Error generating figure: {e}")
-    #     report_document = report_document
-    #     report_keywords = report_keywords
-    # # Generate the WSE time to peak figure
-    # if active_streamlit:
-    #     st.write("Step 11 / 12")
-    #     st.write("Processing for the WSE time to peak...")
-    # else:
-    #     print("Step 11 / 12")
-    #     print("Processing for the WSE time to peak...")
-    # try:
-    #     report_document, report_keywords = plot_wse_ttp(
-    #         report_document,
-    #         report_keywords,
-    #         cell_points,
-    #         num_bins,
-    #         domain_id,
-    #         session_data_dir
-    #     )
-    # except Exception as e:
-    #     st.error(f"Error generating figure: {e}")
-    #     report_document = report_document
-    #     report_keywords = report_keywords
+    try:
+        report_document, report_keywords = plot_streamflow_summary(
+            report_document,
+            report_keywords,
+            df_gages_usgs,
+            dates,
+            domain_id,
+            session_data_dir,
+        )
+    except Exception as e:
+        st.error(f"Error generating figure: {e}")
+        report_document = report_document
+        report_keywords = report_keywords
+    # Generate the NLCD figure
+    if active_streamlit:
+        st.write("Step 8 / 12")
+        st.write("Processing for the NLCD data...")
+    else:
+        print("Step 8 / 12")
+        print("Processing for the NLCD data...")
+    try:
+        report_document, report_keywords = plot_nlcd(
+            report_document,
+            report_keywords,
+            hdf_geom_file_path,
+            nlcd_file_path,
+            domain_id,
+            session_data_dir,
+            active_streamlit,
+        )
+    except Exception as e:
+        st.error(f"Error generating figure: {e}")
+        report_document = report_document
+        report_keywords = report_keywords
+    #Generate the model mesh figure
+    if active_streamlit:
+        st.write("Step 9 / 12")
+        st.write("Processing for the constructed model mesh...")
+    else:
+        print("Step 9 / 12")
+        print("Processing for the constructed model mesh...")
+    try:
+        report_document, report_keywords = plot_model_mesh(
+            report_document,
+            report_keywords,
+            perimeter,
+            breaklines,
+            cell_polygons,
+            domain_id,
+            session_data_dir,
+        )
+    except Exception as e:
+        st.error(f"Error generating figure: {e}")
+        report_document = report_document
+        report_keywords = report_keywords
+    # Generate the max WSE errors figure
+    if active_streamlit:
+        st.write("Step 10 / 12")
+        st.write("Processing for the max WSE errors...")
+    else:
+        print("Step 10 / 12")
+        print("Processing for the max WSE errors...")
+    try:
+        report_document, report_keywords = plot_wse_errors(
+            report_document,
+            report_keywords,
+            cell_points,
+            wse_error_threshold,
+            num_bins,
+            domain_id,
+            session_data_dir,
+        )
+    except Exception as e:
+        st.error(f"Error generating figure: {e}")
+        report_document = report_document
+        report_keywords = report_keywords
+    # Generate the WSE time to peak figure
+    if active_streamlit:
+        st.write("Step 11 / 12")
+        st.write("Processing for the WSE time to peak...")
+    else:
+        print("Step 11 / 12")
+        print("Processing for the WSE time to peak...")
+    try:
+        report_document, report_keywords = plot_wse_ttp(
+            report_document,
+            report_keywords,
+            cell_points,
+            num_bins,
+            domain_id,
+            session_data_dir
+        )
+    except Exception as e:
+        st.error(f"Error generating figure: {e}")
+        report_document = report_document
+        report_keywords = report_keywords
     if len(df_gages_usgs) > 0:
         # Generate the calibration hydrograph figure(s)
         if active_streamlit:
@@ -461,11 +453,10 @@ async def auto_report(
 def main_auto_report(
     hdf_geom_file_path: str,
     hdf_plan_file_path: str,
+    nlcd_file_path: str,
     report_file_path: str,
     input_domain_id: str,
     stream_frequency_threshold: int,
-    nlcd_resolution: int,
-    nlcd_year: int,
     wse_error_threshold: float,
     num_bins: int,
     nid_parquet_file_path: str,
@@ -482,6 +473,8 @@ def main_auto_report(
         The path to the geometry HDF file
     hdf_plan_file_path : str
         The path to the plan HDF file
+    nlcd_file_path : str
+        The path to the NLCD file
     report_file_path : str
         The path to the template report file
     input_domain_id : str
@@ -489,10 +482,6 @@ def main_auto_report(
     stream_frequency_threshold : int
         The threshold frequency for the stream names. Ex: filter to streams whose
         name occurs 20 times or more within the NHDPlus HR network.
-    nlcd_resolution : int
-        The resolution of the NLCD data to retrieve in meters (30)
-    nlcd_year : int
-        The year of the NLCD data to retrieve (2019)
     wse_error_threshold : float
         The threshold for the WSE error
     num_bins : int
@@ -521,12 +510,11 @@ def main_auto_report(
             auto_report(
                 hdf_geom_file_path,
                 hdf_plan_file_path,
+                nlcd_file_path,
                 report_file_path,
                 report_keywords,
                 input_domain_id,
                 stream_frequency_threshold,
-                nlcd_resolution,
-                nlcd_year,
                 wse_error_threshold,
                 num_bins,
                 nid_parquet_file_path,
@@ -541,12 +529,11 @@ def main_auto_report(
             auto_report(
                 hdf_geom_file_path,
                 hdf_plan_file_path,
+                nlcd_file_path,
                 report_file_path,
                 report_keywords,
                 input_domain_id,
                 stream_frequency_threshold,
-                nlcd_resolution,
-                nlcd_year,
                 wse_error_threshold,
                 num_bins,
                 nid_parquet_file_path,

@@ -5,16 +5,19 @@
 import os
 import pandas as pd
 import numpy as np
+import xarray as xr
 from docx import Document
 from docx.shared import Inches
 import streamlit as st
 import contextily as ctx
+import rioxarray as rxr
 import geopandas as gpd
 from rashdf import RasPlanHdf
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import matplotlib.gridspec as gridspec
 import matplotlib.ticker as ticker
+from matplotlib.colors import ListedColormap, BoundaryNorm
 from matplotlib.lines import Line2D
 from mpl_toolkits.axes_grid1 import make_axes_locatable
 
@@ -29,10 +32,10 @@ import warnings
 from hy_river import (
     get_dem_data,
     get_nhd_flowlines,
-    get_nlcd_data,
     get_nwis_streamflow,
     filter_nid,
 )
+from hdf_utils import get_model_perimeter
 
 warnings.filterwarnings("ignore")
 
@@ -680,12 +683,11 @@ def plot_streamflow_summary(
 def plot_nlcd(
     report_document: Document,
     report_keywords: dict,
-    model_perimeter: gpd.GeoDataFrame,
-    nlcd_resolution: int,
-    nlcd_year: int,
+    hdf_geom_file_path: str,
+    nlcd_file_path: str,
     domain_name: str,
     root_dir: str,
-    active_streamlit: bool,
+    active_streamlit: bool
 ):
     """
     Generate the Section 04 Figure 05 for the report
@@ -697,12 +699,10 @@ def plot_nlcd(
         The document to modify
     report_keywords : dict
         The keywords to search for in the document
-    model_perimeter : gpd.GeoDataFrame
-        The perimeter of the model
-    nlcd_resolution: int
-        The resolution of the NLCD data to retrieve (30)
-    nlcd_year: int
-        The year of the NLCD data to retrieve (2019)
+    hdf_geom_file_path : str
+        The file path to the HDF5 geometry file
+    nlcd_file_path : str
+        The file path to the NLCD dataset
     domain_name : str
         The name of the domain
     root_dir : str
@@ -718,51 +718,112 @@ def plot_nlcd(
     report_keywords : dict
         The updated values for the keywords
     """
-    # Retrieve the NLCD data at 30-m resolution for 2019
-    nlcd = get_nlcd_data(model_perimeter, nlcd_resolution, nlcd_year)
-    if isinstance(nlcd, str):
-        if active_streamlit:
-            st.error(f"Error generating figure: {nlcd}")
-        else:
-            print(f"Error generating figure: {nlcd}")
-            report_keywords['figure_nlcd'] = f"Error generating figure: {nlcd}"
+    # Create a dictionary of the land cover metadata
+    meta = {
+        11: 'Open Water',
+        12: 'Perennial Ice/Snow',
+        21: 'Developed, Open Space',
+        22: 'Developed, Low Intensity',
+        23: 'Developed, Medium Intensity',
+        24: 'Developed, High Intensity',
+        31: 'Barren Land (Rock/Sand/Clay)',
+        41: 'Deciduous Forest',
+        42: 'Evergreen Forest',
+        43: 'Mixed Forest',
+        51: 'Dwarf Scrub',
+        52: 'Shrub/Scrub',
+        71: 'Grassland/Herbaceous',
+        72: 'Sedge/Herbaceous',
+        73: 'Lichens',
+        74: 'Moss',
+        81: 'Pasture/Hay',
+        82: 'Cultivated Crops',
+        90: 'Woody Wetlands',
+        95: 'Emergent Herbaceous Wetlands'
+    }
+    # Define the color pallet for the NLCD classes
+    colors = {11: '#486DA2', # Open Water
+              12: '#E7EFFC', # Perennial Ice/Snow
+              21: '#E1CDCE', # Developed, Open Space
+              22: '#DC9881', # Developed, Low Intensity
+              23: '#F10100', # Developed, Medium Intensity
+              24: '#AB0101', # Developed, High Intensity
+              31: '#B3AFA4', # Barren Land (Rock/Sand/Clay)
+              41: '#6CA966', # Deciduous Forest
+              42: '#1D6533', # Evergreen Forest
+              43: '#BDCC93', # Mixed Forest
+              51: '#B49E48', # Dwarf Scrub
+              52: '#D1BB82', # Shrub/Scrub
+              71: '#EDECCD', # Grassland/Herbaceous
+              72: '#D0D181', # Sedge/Herbaceous
+              73: '#A4CC51', # Lichens
+              74: '#82BA9D', # Moss
+              81: '#DDD83E', # Pasture/Hay
+              82: '#AE7229', # Cultivated Crops
+              90: '#BBD7ED', # Woody Wetlands
+              95: '#71A4C1'  # Emergent Herbaceous Wetlands
+            }
+    if nlcd_file_path is None:
+        report_keywords["figure_nlcd"] = "No NLCD data provided"
         return report_document, report_keywords
     else:
-        # Collect the NLCD class names for each ID
-        meta = gh.helpers.nlcd_helper()
-        nlcd_classes = pd.Series(meta["classes"])
-        # split the text where '-' occurs
-        nlcd_classes = nlcd_classes.str.split("-", expand=True)[0]
+        # Load the file into an xarray Dataset object
+        nlcd = rxr.open_rasterio(nlcd_file_path)
+        nlcd = xr.Dataset({"data": nlcd})  
 
-        # Generate the figure
-        cmap, norm, levels = gh.plot.cover_legends()
+        # Load the model perimeter from the HDF5 file
+        model_perimeter = get_model_perimeter(hdf_geom_file_path, domain_name, project_to_4326=False)
+        if model_perimeter.crs != nlcd.rio.crs:
+            model_perimeter = model_perimeter.to_crs(nlcd.rio.crs)
+
+        # Filter the colors and classes to only what is present within the provided dataset
+        unique_nlcd = np.unique(nlcd.data.values)
+        # seperate all unique values that do not belong to the NLCD classes
+        non_nlcd = [value for value in unique_nlcd if value not in meta.keys()]
+        # remove the non-NLCD values from the unique NLCD values
+        unique_nlcd = [value for value in unique_nlcd if value not in non_nlcd]
+        if len(unique_nlcd) == 0:
+            print(f"Raster does not contain any NLCD classes")
+            return report_document, report_keywords
+        
+        colors = [colors[key] for key in unique_nlcd]
+        nlcd_classes = pd.Series(meta)
+        nlcd_classes = nlcd_classes.loc[unique_nlcd] 
+
+        # mask non-NLCD values from the dataset
+        nlcd = nlcd.where(nlcd.isin(unique_nlcd))
+
+        # Create a ListedColormap and BoundaryNorm
+        cmap = ListedColormap(colors)
+        norm = BoundaryNorm(list(nlcd_classes.keys()) + [100], cmap.N)
+        levels = nlcd_classes.index
+
         fig, ax = plt.subplots(figsize=(10, 8), dpi=300)
-        model_perimeter.plot(ax=ax, edgecolor="black", facecolor="none", linewidth=3)
-        cover = nlcd.cover_2019.where(nlcd.cover_2019 != nlcd.cover_2019.rio.nodata)
-        cover.plot(ax=ax, cmap=cmap, levels=levels, add_colorbar=False)
+        model_perimeter.plot(ax=ax, edgecolor="black", facecolor="none", linewidth=3, zorder=1)
+        nlcd.data.plot(ax=ax, add_colorbar=False, cmap=cmap, norm=norm, zorder=0)
         # Create custom legend handles with edge color
         legend_handles = [
             mpatches.Patch(
                 facecolor=cmap(norm(level)),
-                label=f"{nlcd_classes[str(level)]}",
+                label=f"{nlcd_classes[level]}",
                 edgecolor="black",
             )
-            for level in levels[1:-1]
+            for level in levels
         ]
-        ax.set_xlabel("Longitude")
-        ax.set_ylabel("Latitude")
         ax.set_title("")
         # Move the legend outside the plot
         ax.legend(
             loc="upper left",
             bbox_to_anchor=(1, 1),
             handles=legend_handles,
-            title=f"NLCD {nlcd_year}",
+            title=f"NLCD Land Cover Usage",
         )
-        # Add a basemap
-        ctx.add_basemap(
-            ax, crs=model_perimeter.crs, source=ctx.providers.OpenStreetMap.Mapnik
-        )
+        # remove the axis labels
+        ax.set_axis_off()
+        # remove the axis ticks
+        ax.set_xticks([])
+        ax.set_yticks([])
+
         # Save the figure
         image_path = os.path.join(root_dir, f"{domain_name}_figure_nlcd.png")
         fig.savefig(image_path, bbox_inches="tight")
@@ -773,7 +834,7 @@ def plot_nlcd(
         )
         os.remove(image_path)
         # Update the report text
-        report_keywords['figure_nlcd'] = f"NLCD {nlcd_year} Land Cover Usage"
+        report_keywords['figure_nlcd'] = f"NLCD Land Cover Usage"
         return report_document, report_keywords
 
 
