@@ -34,49 +34,59 @@ sys.path.append(srcDir)
 from auto_report import main_auto_report
 
 # Main Page ###################################################################
-
+# layout options: wide, centered, or full-width
 st.set_page_config(layout="wide", page_icon="💧")
 
 if __name__ == "__main__":
     # setup a session data when app is first opened or browser reset
     if "session_id" not in st.session_state:
         initialize_session(rootDir)
+    session_data_dir = st.session_state["session_data_dir"]
 
     st.title(
         "Welcome to the Automated Report Generator for FFRD hydraulic HEC-RAS models! 👋"
     )
 
-    session_data_dir = st.session_state["session_data_dir"]
-    col1, col2, col3 = st.columns(3)
+    # Page Divider: Particles.js animation
+    if "session_id" in st.session_state:
+        components.html(particles_js, scrolling=False, height=300, width=1400)
 
-    # Intro, and required inputs
+    st.write(
+        """This tool is intended to automate the process of generating reports for hydraulic FFRD models created in HEC-RAS. 
+        Model geometry and plan HDF files may be uploaded locally or acquired from S3 with a provided URI. Afterwards, a multitude 
+        of datasets and analyses are processed to generate a comprehensive report as a Word document. The following steps are 
+        outlined for this tool to processes as it generates the report. A user may generate the entire report from the main page here, or 
+        they may generate individual figures and tables from the respective pages in the sidebar. This tool is intended to standardize 
+        and automated high quality report content such as figures and tables such that engineers may spend more time towards technical writing.
+            """
+    )
+
+    col1, col2 = st.columns(2)
     with col1:
-        st.subheader("Introduction:")
         st.write(
             """
-              This tool is intended to automate the process of generating reports for hydraulic FFRD models created in HEC-RAS.
-              
-              Model geometry and plan HDF files may be uploaded locally or acquired from S3 with a provided URI. Afterwards, a multitude
-               of datasets and analyses are processed to generate a comprehensive report as a Word document.
-              The following steps are outlined for this tool to processes as it generates the report:"""
+                1. Processing for the HDF geometry data: model mesh, boundary, and 2D flow area datasets are acquired from the HDF file as spatially referenced geodataframes.
+                2. Processing for the HDF plan data: model results, including water surface elevation (WSE) and flow are acquired from the HDF file and linked by cell ID to their geodataframe counterparts.
+                3. Processing for USGS gage metadata: metadata for USGS gages within the model domain are acquired from the USGS NWIS API.
+                4. Processing for the HUC04 pilot boundary: the HUC04 boundary is acquired from the NHDPlus HR dataset.
+                5. Processing for the DEM dataset: a 30-meter DEM dataset is acquired from the USGS National Map.
+                6. Processing for the NHD stream network: the NHDPlus HR stream network is acquired from the NHDPlus HR dataset.
+                """
         )
-        st.markdown(
+    with col2:
+        st.write(
             """
-                  1. Processing for the HDF geometry data
-                  2. Processing for the HDF plan data
-                  3. Processing for USGS gage metadata
-                  4. Processing for the HUC04 pilot boundary
-                  5. Processing for the DEM dataset
-                  6. Processing for the NHD stream network
-                  7. Processing for the streamflow period of record
-                  8. Processing for the NLCD data
-                  9. Processing for the constructed model mesh
-                  10. Processing for the max WSE errors
-                  11. Processing for the WSE time to peak
-                  12. Processing for the calibration hydrographs
-                  """
+                7. Processing for the streamflow period of record: the period of record for streamflow data is acquired from the USGS NWIS API.
+                8. Processing for the NLCD data: the provided NLCD dataset is used to generate a standardized report figure.
+                9. Processing for the constructed model mesh: the final model mesh is acquired from the geometry HDF file.
+                10. Processing for the max WSE errors: the max WSE errors are calculated for each cell within the model for quality control analytics.
+                11. Processing for the WSE time to peak: the time to peak WSE is calculated for each cell within the model for quality control analytics.
+                12. Processing for the calibration hydrographs: USGS gage calibration hydrographs are intersectected with model time series output at respective reference line locations.
+                """
         )
-
+    col3, col4 = st.columns(2)
+    # Required inputs
+    with col3:
         st.subheader("Required Input:")
         st.write("File paths from the developed HEC-RAS model")
         selected_file_source = st.radio("Select the file source:", ("Local", "S3"))
@@ -104,13 +114,8 @@ if __name__ == "__main__":
                 "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/Denton/Trinity_1203_Denton/Reference/LandCover/Denton_LandCover.tif",
             )
 
-    # Particles.js animation
-    with col2:
-        if "session_id" in st.session_state:
-            components.html(particles_js, scrolling=False, height=1000, width=500)
-
     # Optional inputs
-    with col3:
+    with col4:
         st.subheader("Optional Input:")
         st.write(
             "The name of the 2D flow area within the HEC-RAS model. Only necessary if more than one 2D flow area is present."
@@ -122,7 +127,7 @@ if __name__ == "__main__":
         STREAM_THRESHOLD = st.number_input("Stream Threshold", 20)
         st.write("National Inventory of Dams (NID) vertical height criteria")
         NID_DAM_HEIGHT = st.number_input("Height (ft)", 30)
-        st.write("Spatial resolution of the NLCD data")
+        st.write("Threshold for the histogram's x-axis")
         WSE_ERROR_THRESHOLD = st.number_input("WSE Error Threshold (ft)", 0.2)
         st.write(
             "Number of bins for the histogram to plot with respect to cells within the model"
@@ -142,9 +147,8 @@ if __name__ == "__main__":
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-    col4, col5, col6 = st.columns(3)
-
-    with col4:
+    with col3:
+        # Generate Report
         st.subheader("Generate Report")
         st.write("Click the button below to run the report.")
         if st.button("Begin Report Generation"):
@@ -159,9 +163,9 @@ if __name__ == "__main__":
                         STREAM_THRESHOLD,
                         WSE_ERROR_THRESHOLD,
                         NUM_BINS,
-                        nid_parquet_file,
-                        NID_DAM_HEIGHT,
-                        session_data_dir,
+                        nid_parquet_file_path=nid_parquet_file,
+                        nid_dam_height=NID_DAM_HEIGHT,
+                        session_data_dir=session_data_dir,
                         active_streamlit=True,
                     )
                     st.session_state["data_acquired"] = True
