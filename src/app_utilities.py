@@ -62,11 +62,11 @@ def initialize_session(root_directory: str):
     for folder in os.listdir(session_dir):
         folder_path = os.path.join(session_dir, folder)
         if os.path.isdir(folder_path):
-            if folder != 'test':
-              folder_date = datetime.strptime(folder, "%Y_%b_%d_%H_%M_%S_%f")
-              if (datetime.now() - folder_date).days > 1:
-                  print(f"Deleting old session data directory: {folder}")
-                  shutil.rmtree(folder_path)
+            if folder != "test":
+                folder_date = datetime.strptime(folder, "%Y_%b_%d_%H_%M_%S_%f")
+                if (datetime.now() - folder_date).days > 1:
+                    print(f"Deleting old session data directory: {folder}")
+                    shutil.rmtree(folder_path)
             else:
                 shutil.rmtree(folder_path)
 
@@ -82,6 +82,7 @@ def initialize_session(root_directory: str):
     st.session_state["data_acquired"] = False
     st.session_state["request_zip"] = False
     st.session_state["login_success"] = False
+    st.session_state["figure_generated"] = False
 
 
 def compress_directory(data_directory: str, output_zip_file: str):
@@ -116,6 +117,7 @@ def write_session_parameters(session_state):
         for key in session_state.keys():
             # f.write("%s,%s\n"%(key,my_dict[key]))
             f.write(f"{key},{session_state[key]}\n")
+
 
 particles_js = """<!DOCTYPE html>
 <html lang="en">
