@@ -2,6 +2,7 @@
 
 # Imports #####################################################################
 
+from typing import Optional
 import os
 import pandas as pd
 import numpy as np
@@ -107,12 +108,12 @@ def add_image_to_keyword(report_document: Document, keyword: str, image_path: st
 
 
 def plot_pilot_study_area(
-    report_document: Document,
-    report_keywords: dict,
     model_perimeter: gpd.GeoDataFrame,
     frequency_threshold: int,
     domain_name: str,
     root_dir: str,
+    report_document: Optional[Document] = None,
+    report_keywords: Optional[dict] = None,
 ):
     """
     Generate the Section 01 Figure 01 for the report
@@ -120,11 +121,6 @@ def plot_pilot_study_area(
 
     Parameters
     ----------
-
-    report_document : Docx Document
-        The document to modify
-    report_keywords : dict
-        The keywords to search for in the document
     model_perimeter : gpd.GeoDataFrame
         The perimeter of the model
     frequency_threshold : int
@@ -134,13 +130,21 @@ def plot_pilot_study_area(
         The name of the domain
     root_dir : str
         The root directory
+    report_document : Docx Document
+        The document to modify
+    report_keywords : dict
+        The keywords to search for in the document
 
     return
     ------
-    report_document : Docx Document
-        The modified document
-    report_keywords : dict
-        The updated values for the keywords
+    if report_document is None and report_keywords is None:
+        image_path : str
+            The file path to the image
+    else:
+        report_document : Docx Document
+            The modified document
+        report_keywords : dict
+            The updated values for the keywords
     """
     # determine the center of the model perimeter
     model_bbox = model_perimeter.bounds
@@ -228,30 +232,38 @@ def plot_pilot_study_area(
         ax=ax, crs=model_perimeter.crs, source=ctx.providers.OpenStreetMap.Mapnik
     )
 
+    # Save the figure
     image_path = os.path.join(root_dir, f"{domain_name}_figure_pilot_study_area.png")
     fig.savefig(image_path, bbox_inches="tight")
     plt.close(fig)
-    # Search for the figure keyword within the document and add the image above it
-    report_document = add_image_to_keyword(
-        report_document, "«figure_pilot_study_area»", image_path
-    )
-    os.remove(image_path)
-    # Update the report text
-    basin_name, pilot_name = huc8_boundary.name.values[0], huc4_boundary.name.values[0]
-    report_keywords['Model_Unit_Name'] = basin_name
-    report_keywords['Header_Main'] = f"{pilot_name} / {basin_name}"
-    report_keywords['Header_01'] = f"{pilot_name} / {basin_name}"
-    report_keywords['figure_pilot_study_area'] = f"{pilot_name} Basin Overview with {basin_name} Modeling Unit"
-
-    return report_document, report_keywords
+    if report_document is None and report_keywords is None:
+        return image_path
+    else:
+        # Search for the figure keyword within the document and add the image above it
+        report_document = add_image_to_keyword(
+            report_document, "«figure_pilot_study_area»", image_path
+        )
+        os.remove(image_path)
+        # Update the report text
+        basin_name, pilot_name = (
+            huc8_boundary.name.values[0],
+            huc4_boundary.name.values[0],
+        )
+        report_keywords["Model_Unit_Name"] = basin_name
+        report_keywords["Header_Main"] = f"{pilot_name} / {basin_name}"
+        report_keywords["Header_01"] = f"{pilot_name} / {basin_name}"
+        report_keywords[
+            "figure_pilot_study_area"
+        ] = f"{pilot_name} Basin Overview with {basin_name} Modeling Unit"
+        return report_document, report_keywords
 
 
 def plot_dem(
-    report_document: Document,
-    report_keywords: dict,
     model_perimeter: gpd.GeoDataFrame,
     domain_name: str,
     root_dir: str,
+    report_document: Optional[Document] = None,
+    report_keywords: Optional[dict] = None,
 ):
     """
     Generate the Section 01 Figure 02 for the report
@@ -259,23 +271,26 @@ def plot_dem(
 
     Parameters
     ----------
-    report_document : Docx Document
-        The document to modify
-    report_keywords : dict
-        The keywords to search for in the document
     model_perimeter : gpd.GeoDataFrame
         The perimeter of the model
     domain_name : str
         The name of the domain
     root_dir : str
         The root directory
-
+    report_document : Docx Document
+        The document to modify
+    report_keywords : dict
+        The keywords to search for in the document
     return
     ------
-    report_document : Docx Document
-        The modified document
-    report_keywords : dict
-        The updated values for the keywords
+    if report_document is None and report_keywords is None:
+        image_path : str
+            The file path to the image
+    else:
+        report_document : Docx Document
+            The modified document
+        report_keywords : dict
+            The updated values for the keywords
     """
     # Get the DEM data within the model perimeter
     dem = get_dem_data(model_perimeter)
@@ -300,15 +315,20 @@ def plot_dem(
         image_path = os.path.join(root_dir, f"{domain_name}_figure_dem.png")
         fig.savefig(image_path, bbox_inches="tight")
         plt.close(fig)
-        # Search for the keyword within the document and add the image above it
-        report_document = add_image_to_keyword(
-            report_document, "«figure_dem»", image_path
-        )
-        os.remove(image_path)
-        # Update the report text
-        basin_name = report_keywords['Model_Unit_Name']
-        report_keywords['figure_dem'] = f"{basin_name} Digital Elevation Model (DEM)"
-        return report_document, report_keywords
+        if report_document is None and report_keywords is None:
+            return image_path
+        else:
+            # Search for the keyword within the document and add the image above it
+            report_document = add_image_to_keyword(
+                report_document, "«figure_dem»", image_path
+            )
+            os.remove(image_path)
+            # Update the report text
+            basin_name = report_keywords["Model_Unit_Name"]
+            report_keywords[
+                "figure_dem"
+            ] = f"{basin_name} Digital Elevation Model (DEM)"
+            return report_document, report_keywords
     else:
         # Convert units from m to ft
         dem = dem * 3.28084
@@ -334,20 +354,23 @@ def plot_dem(
         image_path = os.path.join(root_dir, f"{domain_name}_figure_dem.png")
         fig.savefig(image_path, bbox_inches="tight")
         plt.close(fig)
-        # Search for the keyword within the document and add the image above it
-        report_document = add_image_to_keyword(
-            report_document, "«figure_dem»", image_path
-        )
-        os.remove(image_path)
-        # Update the report text
-        basin_name = report_keywords['Model_Unit_Name']
-        report_keywords['figure_dem'] = f"{basin_name} Digital Elevation Model (DEM)"
-        return report_document, report_keywords
+        if report_document is None and report_keywords is None:
+            return image_path
+        else:
+            # Search for the keyword within the document and add the image above it
+            report_document = add_image_to_keyword(
+                report_document, "«figure_dem»", image_path
+            )
+            os.remove(image_path)
+            # Update the report text
+            basin_name = report_keywords["Model_Unit_Name"]
+            report_keywords[
+                "figure_dem"
+            ] = f"{basin_name} Digital Elevation Model (DEM)"
+            return report_document, report_keywords
 
 
 def plot_stream_network(
-    report_document: Document,
-    report_keywords: dict,
     model_perimeter: gpd.GeoDataFrame,
     df_gages_usgs: gpd.GeoDataFrame,
     domain_name: str,
@@ -355,6 +378,8 @@ def plot_stream_network(
     nid_dam_height: int,
     root_dir: str,
     active_streamlit: bool,
+    report_document: Optional[Document] = None,
+    report_keywords: Optional[dict] = None,
 ):
     """
     Generate the Section 04 Figure 03 for the report
@@ -362,10 +387,6 @@ def plot_stream_network(
 
     Parameters
     ----------
-    report_document : Docx Document
-        The document to modify
-    report_keywords : dict
-        The keywords to search for in the document
     model_perimeter : gpd.GeoDataFrame
         The perimeter of the model
     df_gages_usgs : gpd.GeoDataFrame
@@ -381,13 +402,21 @@ def plot_stream_network(
     active_streamlit : bool
         If true, print statements will be displayed in the Streamlit app
         If false, print statements will be displayed in the terminal
+    report_document : Docx Document
+        The document to modify
+    report_keywords : dict
+        The keywords to search for in the document
 
     return
     ------
-    report_document : Docx Document
-        The modified document
-    report_keywords : dict
-        The updated values for the keywords
+    if report_document is None and report_keywords is None:
+        image_path : str
+            The file path to the image
+    else:
+        report_document : Docx Document
+            The modified document
+        report_keywords : dict
+            The updated values for the keywords
     """
     # Generate the figure
     fig, ax = plt.subplots(figsize=(10, 10))
@@ -453,52 +482,52 @@ def plot_stream_network(
     # Add the legend to the new axis
     legend_ax.axis("off")
     legend_ax.legend(custom_handles, labels, loc="center", framealpha=1, ncols=2)
-
     # Add a basemap
     ctx.add_basemap(
         ax, crs=model_perimeter.crs, source=ctx.providers.OpenStreetMap.Mapnik
     )
-
     # Save the figure
     image_path = os.path.join(root_dir, f"{domain_name}_figure_basin_datasets.png")
     fig.savefig(image_path, bbox_inches="tight")
     plt.close(fig)
-    # Search for the keyword within the document and add the image above it
-    report_document = add_image_to_keyword(
-        report_document, "«figure_basin_datasets»", image_path
-    )
-    os.remove(image_path)
-    # Update the report text
-    report_keywords['figure_basin_datasets'] = f"Model Perimeter with NHD Streams, NID Dams, and USGS Gages"
-    return report_document, report_keywords
+    if report_document is None and report_keywords is None:
+        return image_path
+    else:
+        # Search for the keyword within the document and add the image above it
+        report_document = add_image_to_keyword(
+            report_document, "«figure_basin_datasets»", image_path
+        )
+        os.remove(image_path)
+        # Update the report text
+        report_keywords[
+            "figure_basin_datasets"
+        ] = f"Model Perimeter with NHD Streams, NID Dams, and USGS Gages"
+        return report_document, report_keywords
 
 
-def plot_streamflow_summary(
-    report_document: Document,
-    report_keywords: dict,
+def plot_gage_por(
     df_gages_usgs: gpd.GeoDataFrame,
-    dates: tuple,
     domain_name: str,
     root_dir: str,
+    report_document: Optional[Document],
+    report_keywords: Optional[dict],
 ):
     """
     Generate the Section 04 Figure 04 for the report
-    Gage streamflow summary analytics
+    Gage each gage period of record (POR) streamflow data analytic summary
 
     Parameters
     ----------
-    report_document : Docx Document
-        The document to modify
-    report_keywords : dict
-        The keywords to search for in the document
     df_gages_usgs : gpd.GeoDataFrame
         The USGS gages located within the model perimeter
-    dates : tuple
-        The start and end dates to retrieve the streamflow data for
     domain_name : str
         The name of the domain
     root_dir : str
         The root directory
+    report_document : Docx Document
+        The document to modify
+    report_keywords : dict
+        The keywords to search for in the document
 
     return
     ------
@@ -510,184 +539,164 @@ def plot_streamflow_summary(
     if len(df_gages_usgs) > 0:
         # Create an instance of the NWIS class
         nwis = NWIS()
-        stations = df_gages_usgs.site_no.values
-        # Get all available streamflow data within the specified date range
-        qobs_ds = nwis.get_streamflow(
-            stations, dates, mmd=False, to_xarray=True, freq="dv"
-        )
-        if len(qobs_ds.station_id) > 0:
-            print(
-                f"There are {len(qobs_ds.station_id)} USGS stations in the watershed with daily values"
+        generated_image_paths = []
+        # Loop through each station
+        for idx, row in df_gages_usgs.iterrows():
+            station_id = row["site_no"]  # 08059590
+            station = f"USGS-{station_id}"  # USGS-08059590
+            station_name = row["station_nm"]  # Willow Creek at Highway 80
+            print(f"Processing station {station} {station_name}")
+            begin_date = row["begin_date"]
+            end_date = row["end_date"]
+            dates = (begin_date, end_date)
+            # Get all available streamflow data within the specified date range
+            qpor_df_daily = nwis.get_streamflow(
+                [station_id], dates, mmd=False, freq="dv"
             )
-            station_df = pd.DataFrame(qobs_ds.station_id.values, columns=["station_id"])
-            # Loop through each station
-            for idx, row in station_df.iterrows():
-                # Station name, ID, and drainage area
-                station = row["station_id"] # USGS-08059590
-                # Strip the USGS prefix from the station ID
-                station_id = station.split("-")[-1] # 08059590
-                station_name = qobs_ds.station_nm.values[idx] # Willow Creek at Highway 80
-                try:
-                    site_info = nwis.get_info({"site": station_id}, expanded=True)
-                    drainage_area = site_info["drain_area_va"].values[0] # square miles
-                except Exception as e:
-                    print(f"Error retrieving site info for {station_id}: {e}")
-                    report_keywords[f'table03_gage0{idx+1}_name'] = "Data Unavailable"
-                    report_keywords[f'table03_gage0{idx+1}_id'] = "Data Unavailable"
-                    report_keywords[f'table03_gage0{idx+1}_area'] = "Data Unavailable"
-                    report_keywords[f'table03_gage0{idx+1}_por'] = "Data Unavailable"
-                    continue
+            qpor_df_daily = qpor_df_daily * 35.3147  # Convert from cms to cfs
 
-                print(f"Processing station {station} {station_name}")
-                # Period of Record dates
-                por_start = qobs_ds.begin_date.values[idx]
-                por_start_year = pd.to_datetime(por_start).year
-                por_end = qobs_ds.end_date.values[idx]
-                por_end_year = pd.to_datetime(por_end).year
-                por_dates = (por_start, por_end)
-                # Update the report text
-                report_keywords[f'table03_gage0{idx+1}_name'] = station_name
-                report_keywords[f'table03_gage0{idx+1}_id'] = station_id
-                report_keywords[f'table03_gage0{idx+1}_area'] = f"{drainage_area:,}"
-                report_keywords[f'table03_gage0{idx+1}_por'] = f"{por_start_year}-{por_end_year}"
-                # Period of Record streamflow data
-                qpor_df_daily = nwis.get_streamflow(station, por_dates, mmd=False)
-                qpor_df_daily = qpor_df_daily * 35.3147  # Convert from cms to cfs
-                # Calculate the monthly and annual peak streamflow data
-                qpor_df_monthly = qpor_df_daily.copy()
-                qpor_df_monthly = qpor_df_monthly.groupby(
-                    qpor_df_monthly.index.month
-                ).mean()
-                qpor_df_annual = qpor_df_daily.copy()
-                qpor_df_annual = qpor_df_annual.groupby(qpor_df_annual.index.year).max()
-                # Calculate the Annual Exceedance Probability for the annual peak streamflow data
-                aep_df = calc_aep(qpor_df_annual)
+            # Calculate the monthly and annual peak streamflow data
+            qpor_df_monthly = qpor_df_daily.copy()
+            qpor_df_monthly = qpor_df_monthly.groupby(
+                qpor_df_monthly.index.month
+            ).mean()
+            qpor_df_annual = qpor_df_daily.copy()
+            qpor_df_annual = qpor_df_annual.groupby(qpor_df_annual.index.year).max()
 
-                # Generate the figure
-                fig = plt.figure(figsize=(15, 10))
-                # Define a GridSpec with 2 rows and 3 columns
-                gs = gridspec.GridSpec(2, 3, height_ratios=[1, 1])
-                # Create subplots using the GridSpec layout
-                ax1 = fig.add_subplot(gs[0, :])  # Top row, spans all columns
-                ax2 = fig.add_subplot(
-                    gs[1, :2]
-                )  # Bottom row, left subplot, spans two columns
-                ax3 = fig.add_subplot(
-                    gs[1, 2]
-                )  # Bottom row, right subplot, single column
+            # Calculate the Annual Exceedance Probability for the annual peak streamflow data
+            aep_df = calc_aep(qpor_df_annual)
 
-                # Plot the daily streamflow data
-                ax1.plot(
-                    qpor_df_daily.index,
-                    qpor_df_daily.values,
-                    label="Daily Streamflow",
-                    color="blue",
-                    alpha=0.7,
-                )
-                # Plot the monthly average streamflow data
-                qpor_df_monthly.plot(
-                    kind="bar",
-                    ax=ax2,
-                    color="blue",
-                    edgecolor="black",
-                    alpha=0.7,
-                    legend=False,
-                )
-                # Plot the annual peak streamflow data
-                ax3.plot(
-                    aep_df.discharge.values,
-                    aep_df.pr.values,
-                    label="Annual Exceedance Probability",
-                    color="blue",
-                    linewidth=0,
-                    marker="o",
-                    alpha=0.7,
-                )
-                ax3.set_yscale("log")
+            # Generate the figure
+            fig = plt.figure(figsize=(15, 10))
+            # Define a GridSpec with 2 rows and 3 columns
+            gs = gridspec.GridSpec(2, 3, height_ratios=[1, 1])
+            # Create subplots using the GridSpec layout
+            ax1 = fig.add_subplot(gs[0, :])  # Top row, spans all columns
+            ax2 = fig.add_subplot(
+                gs[1, :2]
+            )  # Bottom row, left subplot, spans two columns
+            ax3 = fig.add_subplot(gs[1, 2])  # Bottom row, right subplot, single column
 
-                # Format the x-axis of ax2 to show month names titled 45 degrees
-                ax2.set_xticklabels(
-                    [
-                        "Jan",
-                        "Feb",
-                        "Mar",
-                        "Apr",
-                        "May",
-                        "Jun",
-                        "Jul",
-                        "Aug",
-                        "Sep",
-                        "Oct",
-                        "Nov",
-                        "Dec",
-                    ],
-                    rotation=45,
-                )
-                # Format the x-axis of ax3 to tilt years 45 degrees
-                ax3.set_xticklabels(np.round(aep_df.discharge.values, 1), rotation=45)
+            # Plot the daily streamflow data
+            ax1.plot(
+                qpor_df_daily.index,
+                qpor_df_daily.values,
+                label="Daily Streamflow",
+                color="blue",
+                alpha=0.7,
+            )
+            # Plot the monthly average streamflow data
+            qpor_df_monthly.plot(
+                kind="bar",
+                ax=ax2,
+                color="blue",
+                edgecolor="black",
+                alpha=0.7,
+                legend=False,
+            )
+            # Plot the annual peak streamflow data
+            ax3.plot(
+                aep_df.discharge.values,
+                aep_df.pr.values,
+                label="Annual Exceedance Probability",
+                color="blue",
+                linewidth=0,
+                marker="o",
+                alpha=0.7,
+            )
+            ax3.set_yscale("log")
 
-                # Set the custom y-axis formatter
-                ax1.get_yaxis().set_major_formatter(
-                    ticker.FuncFormatter(lambda x, p: format(int(x), ","))
-                )
-                ax2.get_yaxis().set_major_formatter(
-                    ticker.FuncFormatter(lambda x, p: format(int(x), ","))
-                )
-                ax3.get_xaxis().set_major_formatter(
-                    ticker.FuncFormatter(lambda x, p: format(int(x), ","))
-                )
+            # Format the x-axis of ax2 to show month names titled 45 degrees
+            ax2.set_xticklabels(
+                [
+                    "Jan",
+                    "Feb",
+                    "Mar",
+                    "Apr",
+                    "May",
+                    "Jun",
+                    "Jul",
+                    "Aug",
+                    "Sep",
+                    "Oct",
+                    "Nov",
+                    "Dec",
+                ],
+                rotation=45,
+            )
+            # Format the x-axis of ax3 to tilt years 45 degrees
+            ax3.set_xticklabels(np.round(aep_df.discharge.values, 1), rotation=45)
 
-                # Add a letter to each subplot
-                ax1.text(0.01, 0.90, "(a)", transform=ax1.transAxes, fontsize=24)
-                ax2.text(0.01, 0.90, "(b)", transform=ax2.transAxes, fontsize=24)
-                ax3.text(0.85, 0.90, "(c)", transform=ax3.transAxes, fontsize=24)
+            # Set the custom y-axis formatter
+            ax1.get_yaxis().set_major_formatter(
+                ticker.FuncFormatter(lambda x, p: format(int(x), ","))
+            )
+            ax2.get_yaxis().set_major_formatter(
+                ticker.FuncFormatter(lambda x, p: format(int(x), ","))
+            )
+            ax3.get_xaxis().set_major_formatter(
+                ticker.FuncFormatter(lambda x, p: format(int(x), ","))
+            )
 
-                # Add gridlines to each subplot
-                ax1.grid(True)
-                ax2.grid(True)
-                ax3.grid(True, which="both")
+            # Add a letter to each subplot
+            ax1.text(0.01, 0.90, "(a)", transform=ax1.transAxes, fontsize=24)
+            ax2.text(0.01, 0.90, "(b)", transform=ax2.transAxes, fontsize=24)
+            ax3.text(0.85, 0.90, "(c)", transform=ax3.transAxes, fontsize=24)
 
-                # Add y-axis labels to each subplot
-                ax1.set_ylabel("Q Daily (cfs)")
-                ax2.set_ylabel("Q Monthly (cfs)")
-                ax3.set_ylabel("AEP (%)")
-                ax3.set_xlabel("Q Annual (cfs)")
+            # Add gridlines to each subplot
+            ax1.grid(True)
+            ax2.grid(True)
+            ax3.grid(True, which="both")
 
-                # Add a title to the figure
-                fig.suptitle(f"{station} {station_name}", fontsize=24)
-                # Display the plot
-                plt.tight_layout()
+            # Add y-axis labels to each subplot
+            ax1.set_ylabel("Q Daily (cfs)")
+            ax2.set_ylabel("Q Monthly (cfs)")
+            ax3.set_ylabel("AEP (%)")
+            ax3.set_xlabel("Q Annual (cfs)")
 
-                # Save the figure
-                image_path = os.path.join(
-                    root_dir, f"{domain_name}_figure_stream_gage_summary_{station}.png"
-                )
-                fig.savefig(image_path, bbox_inches="tight")
-                plt.close(fig)
+            # Add a title to the figure
+            fig.suptitle(f"{station} {station_name}", fontsize=24)
+            # Display the plot
+            plt.tight_layout()
+
+            # Save the figure
+            image_path = os.path.join(
+                root_dir, f"{domain_name}_figure_stream_gage_summary_{station}.png"
+            )
+            fig.savefig(image_path, bbox_inches="tight")
+            plt.close(fig)
+            if report_document is None and report_keywords is None:
+                generated_image_paths.append(image_path)
+            else:
                 # Search for the keyword within the document and add the image above it
                 report_document = add_image_to_keyword(
                     report_document, "«figure_stream_gage_summary»", image_path
                 )
                 os.remove(image_path)
-            # Update the report text
-            report_keywords['figure_stream_gage_summary'] = "USGS Gage Streamflow Summary Analytics"
-            return report_document, report_keywords
+
+        if report_document is None and report_keywords is None:
+            return generated_image_paths
         else:
-            print("No USGS stations in the watershed with daily values")
+            # Update the report text
+            report_keywords[
+                "figure_stream_gage_summary"
+            ] = "USGS Gage Streamflow Summary Analytics"
             return report_document, report_keywords
     else:
         print("USGS gages are currently unavailable")
-        return report_document, report_keywords
+        if report_document is None and report_keywords is None:
+            return None
+        else:
+            return report_document, report_keywords
 
 
 def plot_nlcd(
-    report_document: Document,
-    report_keywords: dict,
     hdf_geom_file_path: str,
     nlcd_file_path: str,
     domain_name: str,
     root_dir: str,
-    active_streamlit: bool
+    report_document: Optional[Document] = None,
+    report_keywords: Optional[dict] = None,
 ):
     """
     Generate the Section 04 Figure 05 for the report
@@ -695,10 +704,6 @@ def plot_nlcd(
 
     Parameters
     ----------
-    report_document : Docx Document
-        The document to modify
-    report_keywords : dict
-        The keywords to search for in the document
     hdf_geom_file_path : str
         The file path to the HDF5 geometry file
     nlcd_file_path : str
@@ -707,134 +712,143 @@ def plot_nlcd(
         The name of the domain
     root_dir : str
         The root directory
-    active_streamlit : bool
-        If true, print statements will be displayed in the Streamlit app
-        If false, print statements will be displayed in the terminal
+    report_document : Docx Document
+        The document to modify
+    report_keywords : dict
+        The keywords to search for in the document
 
     return
     ------
-    report_document : Docx Document
-        The modified document
-    report_keywords : dict
-        The updated values for the keywords
+    if report_document is None and report_keywords is None:
+        image_path : str
+            The file path to the image
+    else:
+        report_document : Docx Document
+            The modified document
+        report_keywords : dict
+            The updated values for the keywords
     """
     # Create a dictionary of the land cover metadata
     meta = {
-        11: 'Open Water',
-        12: 'Perennial Ice/Snow',
-        21: 'Developed, Open Space',
-        22: 'Developed, Low Intensity',
-        23: 'Developed, Medium Intensity',
-        24: 'Developed, High Intensity',
-        31: 'Barren Land (Rock/Sand/Clay)',
-        41: 'Deciduous Forest',
-        42: 'Evergreen Forest',
-        43: 'Mixed Forest',
-        51: 'Dwarf Scrub',
-        52: 'Shrub/Scrub',
-        71: 'Grassland/Herbaceous',
-        72: 'Sedge/Herbaceous',
-        73: 'Lichens',
-        74: 'Moss',
-        81: 'Pasture/Hay',
-        82: 'Cultivated Crops',
-        90: 'Woody Wetlands',
-        95: 'Emergent Herbaceous Wetlands'
+        11: "Open Water",
+        12: "Perennial Ice/Snow",
+        21: "Developed, Open Space",
+        22: "Developed, Low Intensity",
+        23: "Developed, Medium Intensity",
+        24: "Developed, High Intensity",
+        31: "Barren Land (Rock/Sand/Clay)",
+        41: "Deciduous Forest",
+        42: "Evergreen Forest",
+        43: "Mixed Forest",
+        51: "Dwarf Scrub",
+        52: "Shrub/Scrub",
+        71: "Grassland/Herbaceous",
+        72: "Sedge/Herbaceous",
+        73: "Lichens",
+        74: "Moss",
+        81: "Pasture/Hay",
+        82: "Cultivated Crops",
+        90: "Woody Wetlands",
+        95: "Emergent Herbaceous Wetlands",
     }
     # Define the color pallet for the NLCD classes
-    colors = {11: '#486DA2', # Open Water
-              12: '#E7EFFC', # Perennial Ice/Snow
-              21: '#E1CDCE', # Developed, Open Space
-              22: '#DC9881', # Developed, Low Intensity
-              23: '#F10100', # Developed, Medium Intensity
-              24: '#AB0101', # Developed, High Intensity
-              31: '#B3AFA4', # Barren Land (Rock/Sand/Clay)
-              41: '#6CA966', # Deciduous Forest
-              42: '#1D6533', # Evergreen Forest
-              43: '#BDCC93', # Mixed Forest
-              51: '#B49E48', # Dwarf Scrub
-              52: '#D1BB82', # Shrub/Scrub
-              71: '#EDECCD', # Grassland/Herbaceous
-              72: '#D0D181', # Sedge/Herbaceous
-              73: '#A4CC51', # Lichens
-              74: '#82BA9D', # Moss
-              81: '#DDD83E', # Pasture/Hay
-              82: '#AE7229', # Cultivated Crops
-              90: '#BBD7ED', # Woody Wetlands
-              95: '#71A4C1'  # Emergent Herbaceous Wetlands
-            }
-    if nlcd_file_path is None:
-        report_keywords["figure_nlcd"] = "No NLCD data provided"
-        return report_document, report_keywords
-    else:
-        # Load the file into an xarray Dataset object
-        nlcd = rxr.open_rasterio(nlcd_file_path)
-        nlcd = xr.Dataset({"data": nlcd})  
+    colors = {
+        11: "#486DA2",  # Open Water
+        12: "#E7EFFC",  # Perennial Ice/Snow
+        21: "#E1CDCE",  # Developed, Open Space
+        22: "#DC9881",  # Developed, Low Intensity
+        23: "#F10100",  # Developed, Medium Intensity
+        24: "#AB0101",  # Developed, High Intensity
+        31: "#B3AFA4",  # Barren Land (Rock/Sand/Clay)
+        41: "#6CA966",  # Deciduous Forest
+        42: "#1D6533",  # Evergreen Forest
+        43: "#BDCC93",  # Mixed Forest
+        51: "#B49E48",  # Dwarf Scrub
+        52: "#D1BB82",  # Shrub/Scrub
+        71: "#EDECCD",  # Grassland/Herbaceous
+        72: "#D0D181",  # Sedge/Herbaceous
+        73: "#A4CC51",  # Lichens
+        74: "#82BA9D",  # Moss
+        81: "#DDD83E",  # Pasture/Hay
+        82: "#AE7229",  # Cultivated Crops
+        90: "#BBD7ED",  # Woody Wetlands
+        95: "#71A4C1",  # Emergent Herbaceous Wetlands
+    }
 
-        # Load the model perimeter from the HDF5 file
-        model_perimeter = get_model_perimeter(hdf_geom_file_path, domain_name, project_to_4326=False)
-        if model_perimeter.crs != nlcd.rio.crs:
-            model_perimeter = model_perimeter.to_crs(nlcd.rio.crs)
+    # Load the file into an xarray Dataset object
+    nlcd = rxr.open_rasterio(nlcd_file_path)
+    nlcd = xr.Dataset({"data": nlcd})
 
-        # Filter the colors and classes to only what is present within the provided dataset
-        unique_nlcd = np.unique(nlcd.data.values)
-        # seperate all unique values that do not belong to the NLCD classes
-        non_nlcd = [value for value in unique_nlcd if value not in meta.keys()]
-        # remove the non-NLCD values from the unique NLCD values
-        unique_nlcd = [value for value in unique_nlcd if value not in non_nlcd]
-        if len(unique_nlcd) == 0:
-            print(f"Raster does not contain any NLCD classes")
-            return report_document, report_keywords
-        
-        colors = [colors[key] for key in unique_nlcd]
-        nlcd_classes = pd.Series(meta)
-        nlcd_classes = nlcd_classes.loc[unique_nlcd] 
+    # Load the model perimeter from the HDF5 file
+    model_perimeter = get_model_perimeter(
+        hdf_geom_file_path, domain_name, project_to_4326=False
+    )
+    if model_perimeter.crs != nlcd.rio.crs:
+        model_perimeter = model_perimeter.to_crs(nlcd.rio.crs)
 
-        # mask non-NLCD values from the dataset
-        nlcd = nlcd.where(nlcd.isin(unique_nlcd))
+    # Filter the colors and classes to only what is present within the provided dataset
+    unique_nlcd = np.unique(nlcd.data.values)
+    # seperate all unique values that do not belong to the NLCD classes
+    non_nlcd = [value for value in unique_nlcd if value not in meta.keys()]
+    # remove the non-NLCD values from the unique NLCD values
+    unique_nlcd = [value for value in unique_nlcd if value not in non_nlcd]
+    if len(unique_nlcd) == 0:
+        raise ValueError("Provided NLCD raster does not contain any NLCD classes")
 
-        # Create a ListedColormap and BoundaryNorm
-        cmap = ListedColormap(colors)
-        norm = BoundaryNorm(list(nlcd_classes.keys()) + [100], cmap.N)
-        levels = nlcd_classes.index
+    colors = [colors[key] for key in unique_nlcd]
+    nlcd_classes = pd.Series(meta)
+    nlcd_classes = nlcd_classes.loc[unique_nlcd]
 
-        fig, ax = plt.subplots(figsize=(10, 8), dpi=300)
-        model_perimeter.plot(ax=ax, edgecolor="black", facecolor="none", linewidth=3, zorder=1)
-        nlcd.data.plot(ax=ax, add_colorbar=False, cmap=cmap, norm=norm, zorder=0)
-        # Create custom legend handles with edge color
-        legend_handles = [
-            mpatches.Patch(
-                facecolor=cmap(norm(level)),
-                label=f"{nlcd_classes[level]}",
-                edgecolor="black",
-            )
-            for level in levels
-        ]
-        ax.set_title("")
-        # Move the legend outside the plot
-        ax.legend(
-            loc="upper left",
-            bbox_to_anchor=(1, 1),
-            handles=legend_handles,
-            title=f"NLCD Land Cover Usage",
+    # mask non-NLCD values from the dataset
+    nlcd = nlcd.where(nlcd.isin(unique_nlcd))
+
+    # Create a ListedColormap and BoundaryNorm
+    cmap = ListedColormap(colors)
+    norm = BoundaryNorm(list(nlcd_classes.keys()) + [100], cmap.N)
+    levels = nlcd_classes.index
+
+    fig, ax = plt.subplots(figsize=(10, 8), dpi=300)
+    model_perimeter.plot(
+        ax=ax, edgecolor="black", facecolor="none", linewidth=3, zorder=1
+    )
+    nlcd.data.plot(ax=ax, add_colorbar=False, cmap=cmap, norm=norm, zorder=0)
+    # Create custom legend handles with edge color
+    legend_handles = [
+        mpatches.Patch(
+            facecolor=cmap(norm(level)),
+            label=f"{nlcd_classes[level]}",
+            edgecolor="black",
         )
-        # remove the axis labels
-        ax.set_axis_off()
-        # remove the axis ticks
-        ax.set_xticks([])
-        ax.set_yticks([])
+        for level in levels
+    ]
+    ax.set_title("")
+    # Move the legend outside the plot
+    ax.legend(
+        loc="upper left",
+        bbox_to_anchor=(1, 1),
+        handles=legend_handles,
+        title=f"NLCD Land Cover Usage",
+    )
+    # remove the axis labels
+    ax.set_axis_off()
+    # remove the axis ticks
+    ax.set_xticks([])
+    ax.set_yticks([])
 
-        # Save the figure
-        image_path = os.path.join(root_dir, f"{domain_name}_figure_nlcd.png")
-        fig.savefig(image_path, bbox_inches="tight")
-        plt.close(fig)
+    # Save the figure
+    image_path = os.path.join(root_dir, f"{domain_name}_figure_nlcd.png")
+    fig.savefig(image_path, bbox_inches="tight")
+    plt.close(fig)
+    if report_document is None and report_keywords is None:
+        return image_path
+    else:
         # Search for the keyword within the document and add the image above it
         report_document = add_image_to_keyword(
             report_document, "«figure_nlcd»", image_path
         )
         os.remove(image_path)
         # Update the report text
-        report_keywords['figure_nlcd'] = f"NLCD Land Cover Usage"
+        report_keywords["figure_nlcd"] = f"NLCD Land Cover Usage"
         return report_document, report_keywords
 
 
@@ -912,18 +926,20 @@ def plot_soil_porosity(
     )
     os.remove(image_path)
     # Update the report text
-    report_keywords['figure_soils'] = "Soil Porosity (inches/ft) within 1 ft of the soil profile"
+    report_keywords[
+        "figure_soils"
+    ] = "Soil Porosity (inches/ft) within 1 ft of the soil profile"
     return report_document, report_keywords
 
 
 def plot_model_mesh(
-    report_document: Document,
-    report_keywords: dict,
     model_perimeter: gpd.GeoDataFrame,
     model_breaklines: gpd.GeoDataFrame,
     model_cells: gpd.GeoDataFrame,
     domain_name: str,
     root_dir: str,
+    report_document: Optional[Document] = None,
+    report_keywords: Optional[dict] = None,
 ):
     """
     Generate the Section 04 Figure 07 for the report
@@ -931,10 +947,6 @@ def plot_model_mesh(
 
     Parameters
     ----------
-    report_document : Docx Document
-        The document to modify
-    report_keywords : dict
-        The keywords to search for in the document
     model_perimeter : gpd.GeoDataFrame
         The perimeter of the model
     model_breaklines : gpd.GeoDataFrame
@@ -945,13 +957,21 @@ def plot_model_mesh(
         The name of the domain
     root_dir : str
         The root directory
+    report_document : Docx Document
+        The document to modify
+    report_keywords : dict
+        The keywords to search for in the document
 
     return
     ------
-    report_document : Docx Document
-        The modified document
-    report_keywords : dict
-        The updated values for the keywords
+    if report_document is None and report_keywords is None:
+        image_path : str
+            The file path to the image
+    else:
+        report_document : Docx Document
+            The modified document
+        report_keywords : dict
+            The updated values for the keywords
     """
     num_cells = len(model_cells)
     num_breaklines = len(model_breaklines)
@@ -993,14 +1013,20 @@ def plot_model_mesh(
     image_path = os.path.join(root_dir, f"{domain_name}_figure_model_mesh.png")
     fig.savefig(image_path, bbox_inches="tight")
     plt.close(fig)
-    # Search for the keyword within the document and add the image above it
-    report_document = add_image_to_keyword(
-        report_document, "«figure_model_mesh»", image_path
-    )
-    os.remove(image_path)
-    # Update the report text
-    report_keywords['figure_model_mesh'] = "Final Constructed Mesh Geometry of the Model"
-    return report_document, report_keywords
+    if report_document is None and report_keywords is None:
+        return image_path
+    else:
+        # Search for the keyword within the document and add the image above it
+        report_document = add_image_to_keyword(
+            report_document, "«figure_model_mesh»", image_path
+        )
+        os.remove(image_path)
+        # Update the report text
+        report_keywords[
+            "figure_model_mesh"
+        ] = "Final Constructed Mesh Geometry of the Model"
+        return report_document, report_keywords
+
 
 def calc_wse_stats(df: pd.DataFrame, target_column: str):
     """ "
@@ -1034,6 +1060,7 @@ def calc_wse_stats(df: pd.DataFrame, target_column: str):
     stats_df["cdf"] = stats_df["pdf"].cumsum() * 100
     stats_df = stats_df.reset_index()
     return stats_df
+
 
 def plot_hist_cdf(
     stats_df: pd.DataFrame,
@@ -1136,14 +1163,15 @@ def plot_hist_cdf(
     plt.savefig(output_path)
     plt.close(fig)
 
+
 def plot_wse_errors(
-    report_document: Document,
-    report_keywords: dict,
     cell_points: gpd.GeoDataFrame,
     wse_error_threshold: float,
     num_bins: int,
     domain_name: str,
     root_dir: str,
+    report_document: Optional[Document] = None,
+    report_keywords: Optional[dict] = None,
 ):
     """
     Generate the Appendix A Figure 09 for the report
@@ -1151,10 +1179,6 @@ def plot_wse_errors(
 
     Parameters
     ----------
-    report_document : Docx Document
-        The document to modify
-    report_keywords : dict
-        The keywords to search for in the document
     cell_points : gpd.GeoDataFrame
         The cell points GeoDataFrame
     wse_error_threshold: float
@@ -1165,13 +1189,21 @@ def plot_wse_errors(
         The name of the domain
     root_dir : str
         The root directory
+    report_document : Docx Document
+        The document to modify
+    report_keywords : dict
+        The keywords to search for in the document
 
     Returns
     -------
-    report_document : Docx Document
-        The modified document
-    report_keywords : dict
-        The updated values for the keywords
+    if report_document is None and report_keywords is None:
+        image_path : str
+            The file path to the image
+    else:
+        report_document : Docx Document
+            The modified document
+        report_keywords : dict
+            The updated values for the keywords
     """
 
     # Generate the Figure for the WSE Error QC
@@ -1180,17 +1212,29 @@ def plot_wse_errors(
     # Process Max WSE Errors and export graphics
     if len(cell_points) == 0:
         print("No cells found in the HDF file")
-        report_keywords['figure_wse_errors'] = "No cells found in the HDF file"
-        return report_document, report_keywords
+        output_message = "No cells found in the HDF file"
+        if report_document is None and report_keywords is None:
+            return output_message
+        else:
+            report_keywords["figure_wse_errors"] = "No cells found in the HDF file"
+            return report_document, report_keywords
     elif len(cell_points[cell_points["max_ws_err"] > 0]) == 0:
         print("No cells with WSE errors greater than zero")
-        report_keywords['figure_wse_errors'] = "No cells with WSE errors greater than zero"
-        return report_document, report_keywords
+        output_message = "No cells with WSE errors greater than zero"
+        if report_document is None and report_keywords is None:
+            return output_message
+        else:
+            report_keywords[
+                "figure_wse_errors"
+            ] = "No cells with WSE errors greater than zero"
+            return report_document, report_keywords
     else:
         # Calculate the frequency, PDF, and CDF of the max WSE errors
         cell_stats_df = calc_wse_stats(cell_points, "max_ws_err")
         num_cells = len(cell_points)
-        cells_exceeding_threshold = cell_points[cell_points["max_ws_err"] > wse_error_threshold]
+        cells_exceeding_threshold = cell_points[
+            cell_points["max_ws_err"] > wse_error_threshold
+        ]
         num_cells_exceeding_threshold = len(cells_exceeding_threshold)
         max_wse_error = cell_points["max_ws_err"].max()
         # Plot the histogram and CDF of the max WSE errors
@@ -1202,24 +1246,29 @@ def plot_wse_errors(
             num_bins,
             image_path,
         )
-        # Search for the keyword within the document and add the image above it
-        report_document = add_image_to_keyword(
-            report_document, "«figure_wse_errors»", image_path
-        )
-        os.remove(image_path)
-        # Update the report text
-        report_keywords['figure_wse_errors'] = f"""Maximum Water Surface Elevation Error Spatial Distribution. Among the {num_cells:,} wetted cells, approximately {num_cells_exceeding_threshold:,} cells have errors exceeding a threshold of {wse_error_threshold:.2f}-feet, with a maximum recorded error of {max_wse_error:.1f}-feet.
-        """
-        return report_document, report_keywords
+        if report_document is None and report_keywords is None:
+            return image_path
+        else:
+            # Search for the keyword within the document and add the image above it
+            report_document = add_image_to_keyword(
+                report_document, "«figure_wse_errors»", image_path
+            )
+            os.remove(image_path)
+            # Update the report text
+            report_keywords[
+                "figure_wse_errors"
+            ] = f"""Maximum Water Surface Elevation Error Spatial Distribution. Among the {num_cells:,} wetted cells, approximately {num_cells_exceeding_threshold:,} cells have errors exceeding a threshold of {wse_error_threshold:.2f}-feet, with a maximum recorded error of {max_wse_error:.1f}-feet.
+            """
+            return report_document, report_keywords
 
 
 def plot_wse_ttp(
-    report_document: Document,
-    report_keywords: dict,
     cell_points: gpd.GeoDataFrame,
     num_bins: int,
     domain_name: str,
     root_dir: str,
+    report_document: Optional[Document],
+    report_keywords: Optional[dict],
 ):
     """
     Generate the Appendix A Figure 10 for the report
@@ -1227,10 +1276,6 @@ def plot_wse_ttp(
 
     Parameters
     ----------
-    report_document : Docx Document
-        The document to modify
-    report_keywords : dict
-        The keywords to search for in the document
     cell_points : gpd.GeoDataFrame
         The cell points GeoDataFrame
     num_bins: int
@@ -1239,13 +1284,21 @@ def plot_wse_ttp(
         The name of the domain
     root_dir : str
         The root directory
+    report_document : Docx Document
+        The document to modify
+    report_keywords : dict
+        The keywords to search for in the document
 
     Returns
     -------
-    report_document : Docx Document
-        The modified document
-    report_keywords : dict
-        The updated values for the keywords
+    if report_document is None and report_keywords is None:
+        output_message : str
+            The output message
+    else:
+        report_document : Docx Document
+            The modified document
+        report_keywords : dict
+            The updated values for the keywords
     """
 
     # Generate the Figure for the WSE Error QC
@@ -1254,8 +1307,12 @@ def plot_wse_ttp(
     # Process WSE time to peak
     if len(cell_points) == 0:
         print("No cells found in the HDF file")
-        report_keywords['figure_wse_ttp'] = "No cells found in the HDF file"
-        return report_document, report_keywords
+        output_message = "No cells found in the HDF file"
+        if report_document is None and report_keywords is None:
+            return output_message
+        else:
+            report_keywords["figure_wse_ttp"] = "No cells found in the HDF file"
+            return report_document, report_keywords
 
     # Determine the global min time to peak for the simulation start time
     start_time = cell_points["min_ws_time"].min()
@@ -1268,8 +1325,14 @@ def plot_wse_ttp(
 
     if len(ttp[ttp["ttp_hrs"] > 0]) == 0:
         print("No cells with time to peak greater than zero")
-        report_keywords['figure_wse_ttp'] = "No cells with time to peak greater than zero"
-        return report_document, report_keywords
+        output_message = "No cells with time to peak greater than zero"
+        if report_document is None and report_keywords is None:
+            return output_message
+        else:
+            report_keywords[
+                "figure_wse_ttp"
+            ] = "No cells with time to peak greater than zero"
+            return report_document, report_keywords
     else:
         # Define the global max time to peak
         ttp_max = ttp["ttp_hrs"].max()
@@ -1288,15 +1351,20 @@ def plot_wse_ttp(
             num_bins,
             image_path,
         )
-        # Search for the keyword within the document and add the image above it
-        report_document = add_image_to_keyword(
-            report_document, "«figure_wse_ttp»", image_path
-        )
-        os.remove(image_path)
-        # Update the report text
-        report_keywords['figure_wse_ttp'] = f"""Water Surface Elevation Time-to-Peak Spatial Distribution. The full duration for the model simulation is {ttp_max:.0f} hours. Among the {num_cells:,} wetted cells, at least {num_cells_exceeding_threshold:,} was still increasing in water surface elevation during the final hour of the simulation.
-        """
-        return report_document, report_keywords
+        if report_document is None and report_keywords is None:
+            return image_path
+        else:
+            # Search for the keyword within the document and add the image above it
+            report_document = add_image_to_keyword(
+                report_document, "«figure_wse_ttp»", image_path
+            )
+            os.remove(image_path)
+            # Update the report text
+            report_keywords[
+                "figure_wse_ttp"
+            ] = f"""Water Surface Elevation Time-to-Peak Spatial Distribution. The full duration for the model simulation is {ttp_max:.0f} hours. Among the {num_cells:,} wetted cells, at least {num_cells_exceeding_threshold:,} was still increasing in water surface elevation during the final hour of the simulation.
+            """
+            return report_document, report_keywords
 
 
 def find_timstep_freq(df: pd.DataFrame):
@@ -1323,66 +1391,72 @@ def find_timstep_freq(df: pd.DataFrame):
 
 
 def plot_hydrographs(
-    report_document: Document,
-    report_keywords: dict,
     hdf_plan_file_path: str,
     df_gages_usgs: gpd.GeoDataFrame,
-    dates: tuple,
     domain_name: str,
     root_dir: str,
-    active_streamlit: bool,
+    report_document: Optional[Document] = None,
+    report_keywords: Optional[dict] = None,
 ):
     """
     Generate the gage hydrograph calibration plots
 
     Parameters
     ----------
-    report_document : Docx Document
-        The document to modify
-    report_keywords : dict
-        The keywords to search for in the document
     hdf_plan_file_path : str
         The path to the HDF plan file
     df_gages_usgs : gpd.GeoDataFrame
         The USGS gages located within the model perimeter
-    dates : tuple
-        The dates for the calibration period
     domain_name : str
         The name of the domain
     root_dir : str
         The root directory
-    active_streamlit : bool
-        If true, print statements will be displayed in the Streamlit app
-        If false, print statements will be displayed in the terminal
+    report_document : Docx Document
+        The document to modify
+    report_keywords : dict
+        The keywords to search for in the document
 
     Returns
     -------
-    report_document : Docx Document
-        The modified document
-    report_keywords : dict
-        The updated values for the keywords
+    if report_document is None and report_keywords is None:
+        image_path_list : list
+            The list of file paths to the images
+    else:
+        report_document : Docx Document
+            The modified document
+        report_keywords : dict
+            The updated values for the keywords
     """
-    print(f"Calibration period: {dates[0]} to {dates[1]}")
+
     # Open the HDF plan file for the reference line data
     plan_hdf = RasPlanHdf.open_uri(hdf_plan_file_path)
     ref_lines = plan_hdf.reference_lines()
     ref_lines = ref_lines.to_crs(epsg=4326)  # convert to EPSG:4326
     ref_lines_ds = plan_hdf.reference_lines_timeseries_output()
+    # Get the simulation start and end times
+    plan_attrs = plan_hdf.get_plan_info_attrs()
+    start_time = plan_attrs["Simulation Start Time"]
+    end_time = plan_attrs["Simulation End Time"]
+    dates = (start_time, end_time)
+    print(f"Calibration period: {start_time} to {end_time}")
 
     # Query the NWIS server for streamflow at the gage locations
     qobs_ds = get_nwis_streamflow(df_gages_usgs, dates)
     if isinstance(qobs_ds, str):
-        if active_streamlit:
-            st.error(f"Error generating figure: {qobs_ds}")
+        if report_document is None and report_keywords is None:
+            print(f"Error generating figure: {qobs_ds}")
+            output_message = f"Error generating figure: {qobs_ds}"
+            return output_message
         else:
             print(f"Error generating figure: {qobs_ds}")
-        report_keywords['figure_gage_cal'] = f"Error generating figure: {qobs_ds}"
-        return report_document, report_keywords
+            report_keywords["figure_gage_cal"] = f"Error generating figure: {qobs_ds}"
+            return report_document, report_keywords
 
     # Units of degrees for EPSG:4326 to buffer outwards from the reference line location
     buffer_increment = 0.001  # Ex: 0.001 degrees is approximately 100 meters
     # Loop through each reference line within the model
     print("Plotting hydrographs for each reference line")
+    image_path_list = []
     for idx, line_id in enumerate(ref_lines.refln_id.values):
         # Intersect the gages with the reference lines
         gage_df = df_gages_usgs[
@@ -1463,11 +1537,14 @@ def plot_hydrographs(
                 )
                 fig.savefig(image_path, bbox_inches="tight")
                 plt.close(fig)
-                # Search for the keyword within the document and add the image above it
-                report_document = add_image_to_keyword(
-                    report_document, "«figure_gage_cal»", image_path
-                )
-                os.remove(image_path)
+                if report_document is None and report_keywords is None:
+                    image_path_list.append(image_path)
+                else:
+                    # Search for the keyword within the document and add the image above it
+                    report_document = add_image_to_keyword(
+                        report_document, "«figure_gage_cal»", image_path
+                    )
+                    os.remove(image_path)
         # Non-trivial scenario: no rows returned indicating no gages are within the buffer distance
         # Need to buffer out the reference line until the closest gage (within reason) is found
         elif len(gage_df) == 0:
@@ -1562,15 +1639,21 @@ def plot_hydrographs(
                     )
                     fig.savefig(image_path, bbox_inches="tight")
                     plt.close(fig)
-                    # Search for the keyword within the document and add the image above it
-                    report_document = add_image_to_keyword(
-                        report_document, "«figure_gage_cal»", image_path
-                    )
-                    os.remove(image_path)
+                    if report_document is None and report_keywords is None:
+                        image_path_list.append(image_path)
+                    else:
+                        # Search for the keyword within the document and add the image above it
+                        report_document = add_image_to_keyword(
+                            report_document, "«figure_gage_cal»", image_path
+                        )
+                        os.remove(image_path)
             elif len(gage_df) > 1:
                 raise ValueError(
-                    "Multiple gages found within the minimum buffer distance of the reference line."
+                    f"{len(gage_df)} gages found within the minimum buffer distance of the reference line. {gage_df}."
                 )
-    # Update the report text
-    report_keywords['figure_gage_cal'] = "USGS Gage Calibration Plots"
-    return report_document, report_keywords
+    if report_document is None and report_keywords is None:
+        return image_path_list
+    else:
+        # Update the report text
+        report_keywords["figure_gage_cal"] = "USGS Gage Calibration Plots"
+        return report_document, report_keywords
