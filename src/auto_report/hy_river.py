@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # Imports #####################################################################
+from typing import Optional
 import requests
 import pandas as pd
 from shapely.geometry import Point
@@ -185,6 +186,8 @@ def filter_nid(
 
     # Filter to the points with a height greater or equal to the threshold
     nid_df = nid_df[nid_df["damHeight"] >= height_threshold]
+    # Remove any dams with missing height values
+    nid_df = nid_df.dropna(subset=['damHeight'])
 
     # Ensure the point data has 'latitude' and 'longitude' columns
     if "latitude" not in nid_df.columns or "longitude" not in nid_df.columns:
@@ -192,8 +195,8 @@ def filter_nid(
             "The Parquet file must contain 'latitude' and 'longitude' columns."
         )
 
-    # Filter to only the latitude and longitude columns
-    nid_df = nid_df[["latitude", "longitude"]]
+    # Filter to only the core columns of interest
+    nid_df = nid_df[["latitude", "longitude", "damHeight", "nidId", "name"]]
 
     if len(nid_df) == 0:
         return None
@@ -257,7 +260,7 @@ def get_nlcd_data(model_perimeter: gpd.GeoDataFrame, resolution: int, year: int)
             return return_statement
 
 
-def get_usgs_stations(model_perimeter: gpd.GeoDataFrame, dates: tuple):
+def get_usgs_stations(model_perimeter: gpd.GeoDataFrame, dates: Optional[tuple] = None):
     """
     Get the USGS gage stations within the model perimeter
 
@@ -284,26 +287,36 @@ def get_usgs_stations(model_perimeter: gpd.GeoDataFrame, dates: tuple):
         "bBox": ",".join(f"{b:.06f}" for b in bbox),
         "hasDataTypeCd": "dv",
         "outputDataTypeCd": "dv",
+        "parameterCd": "00060",
     }
-    info_box = nwis.get_info(query_dv)
+    info_box_dv = nwis.get_info(query_dv)
 
-    dv_gages = info_box[
-        (info_box.begin_date <= dates[0]) & (info_box.end_date >= dates[1])
-    ]
     # Query gage stations with instantaneous values
     query_iv = {
         "bBox": ",".join(f"{b:.06f}" for b in bbox),
         "hasDataTypeCd": "iv",
         "outputDataTypeCd": "iv",
+        "parameterCd": "00060",
     }
-    info_box = nwis.get_info(query_iv)
+    info_box_iv = nwis.get_info(query_iv)
 
-    iv_gages = info_box[
-        (info_box.begin_date <= dates[0]) & (info_box.end_date >= dates[1])
-    ]
-
-    # Combine the gage stations with daily and instantaneous values
-    df_gages_usgs = pd.concat([dv_gages, iv_gages]).drop_duplicates(subset=["site_no"])
+    if dates is None:
+        # Don't filter the gage stations by date
+        df_gages_usgs = pd.concat([info_box_dv, info_box_iv]).drop_duplicates(
+            subset=["site_no"]
+        )
+    else:
+        # Filter the gage stations by date
+        dv_gages = info_box_dv[
+            (info_box_dv.begin_date <= dates[0]) & (info_box_dv.end_date >= dates[1])
+        ]
+        iv_gages = info_box_iv[
+            (info_box_iv.begin_date <= dates[0]) & (info_box_iv.end_date >= dates[1])
+        ]
+        # Combine the gage stations with daily and instantaneous values
+        df_gages_usgs = pd.concat([dv_gages, iv_gages]).drop_duplicates(
+            subset=["site_no"]
+        )
 
     # Convert df_gages_usgs to a geodataframe
     df_gages_usgs = gpd.GeoDataFrame(
@@ -318,7 +331,7 @@ def get_usgs_stations(model_perimeter: gpd.GeoDataFrame, dates: tuple):
     df_gages_usgs = df_gages_usgs[
         df_gages_usgs.within(model_perimeter.geometry.iloc[0])
     ]
-    return df_gages_usgs
+    return df_gages_usgs.reset_index(drop=True)
 
 
 def get_nwis_streamflow(df_gages_usgs: gpd.GeoDataFrame, dates: tuple):
