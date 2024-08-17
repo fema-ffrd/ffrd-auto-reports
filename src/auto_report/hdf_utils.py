@@ -13,6 +13,7 @@ from shapely.geometry import Polygon
 from rashdf import RasPlanHdf, RasGeomHdf
 from pyproj import CRS
 import fsspec
+from typing import Optional
 
 # Functions ###################################################################
 
@@ -28,7 +29,10 @@ def init_s3_keys():
     os.environ["AWS_ACCESS_KEY_ID"] = os.getenv("AWS_ACCESS_KEY_ID")
     os.environ["AWS_SECRET_ACCESS_KEY"] = os.getenv("AWS_SECRET_ACCESS_KEY")
 
-def get_model_perimeter(hdf_file_path: str, input_domain_id: str, project_to_4326: bool):
+
+def get_model_perimeter(
+    hdf_file_path: str, input_domain_id: Optional[str], project_to_4326: bool
+):
     """
     Get the HDF data
 
@@ -47,6 +51,7 @@ def get_model_perimeter(hdf_file_path: str, input_domain_id: str, project_to_432
         The perimeter of the mesh
     """
     new_crs = "EPSG:4326"
+    simplify_threshold = 300  # distance in feet
 
     # Open the HDF file from the S3 bucket
     if hdf_file_path.startswith("s3://"):
@@ -62,30 +67,220 @@ def get_model_perimeter(hdf_file_path: str, input_domain_id: str, project_to_432
         # Open the HDF file from the local file path
         geom_hdf = RasGeomHdf(hdf_file_path)
 
-    # First get the mesh areas. If this fails, exit the function
+    # First try to get the mesh areas. If this fails, exit the function
     try:
         perimeter = geom_hdf.mesh_areas()
-        if project_to_4326:
-            perimeter = perimeter.to_crs(new_crs)
-        else:
-            pass
     except Exception as e:
         raise ValueError(f"Error getting the mesh areas: {e}")
-    
+
     # Check if there is only one domain
     domain_id = perimeter["mesh_name"].unique()
-    if len(domain_id) == 1:
-        return perimeter
-    elif len(domain_id) > 1:
+    if len(domain_id) > 1:
         if input_domain_id not in domain_id:
             raise ValueError(
                 f"Input Domain ID {input_domain_id} not found in the HDF file. {domain_id}"
             )
         else:
             perimeter = perimeter[perimeter["mesh_name"] == input_domain_id]
+            # Simplify the perimeter to avoid issues with overlapping vertices
+            perimeter_geom = perimeter.simplify(simplify_threshold).union_all()
+            perimeter.geometry.iloc[0] = perimeter_geom
+            if project_to_4326:
+                perimeter = perimeter.to_crs(new_crs)
             return perimeter
+    elif len(domain_id) == 1:
+        # Simplify the perimeter to avoid issues with overlapping vertices
+        perimeter_geom = perimeter.simplify(simplify_threshold).union_all()
+        perimeter.geometry.iloc[0] = perimeter_geom
+        if project_to_4326:
+            perimeter = perimeter.to_crs(new_crs)
+        return perimeter
 
-def get_hdf_plan(hdf_file_path: str, input_domain_id: str):
+
+def get_model_breaklines(hdf_file_path: str, project_to_4326: bool):
+    """
+    Get the model breaklines from the HDF file
+
+    Parameters
+    ----------
+    hdf_file_path : str
+        The file path to the HDF file
+    project_to_4326 : bool
+        A flag to project the data to EPSG:4326
+
+    Returns
+    -------
+    breaklines : gpd.GeoDataFrame
+        The breaklines GeoDataFrame
+    """
+    new_crs = "EPSG:4326"
+
+    # Open the HDF file from the S3 bucket
+    if hdf_file_path.startswith("s3://"):
+        # initialize the S3 keys
+        try:
+            init_s3_keys()
+            geom_hdf = RasGeomHdf.open_uri(hdf_file_path)
+        except Exception as e:
+            raise ValueError(
+                f"Error initializing the S3 keys. Check your AWS credentials. {e}"
+            )
+    else:
+        # Open the HDF file from the local file path
+        geom_hdf = RasGeomHdf(hdf_file_path)
+
+    # Get the breaklines
+    try:
+        breaklines = geom_hdf.breaklines()
+    except Exception as e:
+        # If the breaklines are not available, create an empty GeoDataFrame
+        print(f"Error getting the breaklines: {e}")
+        print("Creating an empty GeoDataFrame for the breaklines")
+        breaklines = gpd.GeoDataFrame(
+            [], columns=["x", "y"], geometry=[], crs="EPSG:4326"
+        )
+    if project_to_4326:
+        # Convert the CRS to EPSG:4326
+        breaklines = breaklines.to_crs(new_crs)
+
+    return breaklines
+
+
+def get_model_cell_polygons(hdf_file_path: str, project_to_4326: bool):
+    """
+    Get the model cell polygons from the HDF file
+
+    Parameters
+    ----------
+    hdf_file_path : str
+        The file path to the HDF file
+    project_to_4326 : bool
+        A flag to project the data to EPSG:4326
+
+    Returns
+    -------
+    cell_polygons : gpd.GeoDataFrame
+        The cell polygons GeoDataFrame
+    """
+    new_crs = "EPSG:4326"
+
+    # Open the HDF file from the S3 bucket
+    if hdf_file_path.startswith("s3://"):
+        # initialize the S3 keys
+        try:
+            init_s3_keys()
+            geom_hdf = RasGeomHdf.open_uri(hdf_file_path)
+        except Exception as e:
+            raise ValueError(
+                f"Error initializing the S3 keys. Check your AWS credentials. {e}"
+            )
+    else:
+        # Open the HDF file from the local file path
+        geom_hdf = RasGeomHdf(hdf_file_path)
+
+    # Get the mesh cell polygons
+    try:
+        cell_polygons = geom_hdf.mesh_cell_polygons()
+    except Exception as e:
+        # If the mesh cell polygons are not available, create an empty GeoDataFrame
+        print(f"Error getting the mesh cell polygons: {e}")
+        print("Creating an empty GeoDataFrame for the cell polygons")
+        cell_polygons = gpd.GeoDataFrame(
+            [], columns=["x", "y"], geometry=[], crs="EPSG:4326"
+        )
+    if project_to_4326:
+        # Convert the CRS to EPSG:4326
+        cell_polygons = cell_polygons.to_crs(new_crs)
+
+    return cell_polygons
+
+
+def get_plan_cell_pts(hdf_file_path: str):
+    """
+    Get the HDF solution point data
+
+    Parameters
+    ----------
+    hdf_file_path : str
+        The file path to the HDF file
+
+    Returns
+    -------
+    cell_points : gpd.GeoDataFrame
+        The cell points GeoDataFrame
+    """
+
+    # Open the HDF file from the S3 bucket
+    if hdf_file_path.startswith("s3://"):
+        # initialize the S3 keys
+        try:
+            init_s3_keys()
+            plan_hdf = RasPlanHdf.open_uri(hdf_file_path)
+        except Exception as e:
+            raise ValueError(
+                f"Error initializing the S3 keys. Check your AWS credentials. {e}"
+            )
+    else:
+        # Open the HDF file from the local file path
+        plan_hdf = RasPlanHdf(hdf_file_path)
+
+    # First get the mesh areas. If this fails, exit the function
+    try:
+        perimeter = plan_hdf.mesh_areas()
+    except Exception as e:
+        raise ValueError(f"Error getting the mesh areas: {e}")
+
+    # Get the mesh cell points
+    try:
+        cell_points = plan_hdf.mesh_cell_points()
+    except Exception as e:
+        # If the mesh cell points are not available, create an empty GeoDataFrame
+        print(f"Error getting the mesh cell points: {e}")
+        print("Creating an empty GeoDataFrame for the cell points")
+        cell_points = gpd.GeoDataFrame(
+            [], columns=["x", "y"], geometry=[], crs="EPSG:4326"
+        )
+    return cell_points
+
+
+def get_plan_params_attrs(hdf_file_path: str):
+    """
+    Get the simulation plan info attributes and parameters
+
+    Parameters
+    ----------
+    hdf_file_path : str
+        The file path to the HDF file
+
+    Returns
+    -------
+    plan_params : dict
+        The plan parameters
+    plan_attrs : dict
+        The plan attributes
+    """
+    # Open the HDF file from the S3 bucket
+    if hdf_file_path.startswith("s3://"):
+        # initialize the S3 keys
+        try:
+            init_s3_keys()
+            plan_hdf = RasPlanHdf.open_uri(hdf_file_path)
+        except Exception as e:
+            raise ValueError(
+                f"Error initializing the S3 keys. Check your AWS credentials. {e}"
+            )
+    else:
+        # Open the HDF file from the local file path
+        plan_hdf = RasPlanHdf(hdf_file_path)
+
+    # Get the simulation plan info attributes
+    plan_params = plan_hdf.get_plan_param_attrs()
+    plan_attrs = plan_hdf.get_plan_info_attrs()
+
+    return plan_params, plan_attrs
+
+
+def get_bulk_hdf_plan(hdf_file_path: str, input_domain_id: str):
     """
     Get the HDF data
 
@@ -98,16 +293,12 @@ def get_hdf_plan(hdf_file_path: str, input_domain_id: str):
 
     Returns
     -------
-    perimeter : gpd.GeoDataFrame
-        The perimeter of the mesh
-    perimeter_geojson : dict
-        The geojson object
-    domain_id : str
-        The domain ID
-    cell_polygons : gpd.GeoDataFrame
-        The cell polygons GeoDataFrame
-    breaklines : gpd.GeoDataFrame
-        The breaklines GeoDataFrame
+    cell_points : gpd.GeoDataFrame
+        The cell points GeoDataFrame
+    plan_params : dict
+        The plan parameters
+    plan_attrs : dict
+        The plan attributes
     """
     new_crs = "EPSG:4326"
 
@@ -145,10 +336,7 @@ def get_hdf_plan(hdf_file_path: str, input_domain_id: str):
     # Get the simulation plan info attributes
     plan_params = plan_hdf.get_plan_param_attrs()
     plan_attrs = plan_hdf.get_plan_info_attrs()
-    start_time = plan_attrs["Simulation Start Time"]
-    end_time = plan_attrs["Simulation End Time"]
-    dates = (start_time, end_time)
-    
+
     # Convert the CRS to EPSG:4326
     cell_points = cell_points.to_crs(new_crs)
     # Check if there is only one domain
@@ -164,10 +352,10 @@ def get_hdf_plan(hdf_file_path: str, input_domain_id: str):
     else:
         domain_id = domain_id[0]
 
-    return (cell_points, dates, plan_params, plan_attrs)
+    return (cell_points, plan_params, plan_attrs)
 
 
-def get_hdf_geom(hdf_file_path: str, input_domain_id: str):
+def get_bulk_hdf_geom(hdf_file_path: str, input_domain_id: str):
     """
     Get the HDF data
 
@@ -257,9 +445,6 @@ def get_hdf_geom(hdf_file_path: str, input_domain_id: str):
     breaklines = breaklines.to_crs(new_crs)
     # Get the projection information
     proj_table = hdf_projection_table(geom_hdf)
-    # Convert the perimeter to a geo json object
-    geojson_str = perimeter.to_json()
-    perimeter_geojson = json.loads(geojson_str)
     # Check if there is only one domain
     domain_id = perimeter["mesh_name"].unique()
     if len(domain_id) > 1:
@@ -275,228 +460,11 @@ def get_hdf_geom(hdf_file_path: str, input_domain_id: str):
 
     return (
         perimeter,
-        perimeter_geojson,
         domain_id,
         cell_polygons,
         breaklines,
         proj_table,
     )
-
-
-def get_domain_names(hdf_file_path: h5py.File):
-    """
-    Get all domain flow area names from the HDF file
-
-    Parameters
-    ----------
-    hdf_file_path : str
-        The file path to the HDF file
-
-    Returns
-    -------
-    flow_areas
-        A list of domain names
-    """
-    flow_areas = []
-    omit = [
-        "Attributes",
-        "Cell Info",
-        "Cell Points",
-        "Polygon Info",
-        "Polygon Parts",
-        "Polygon Points",
-    ]
-    # open hdf from s3 uri
-    if hdf_file_path.startswith("s3://"):
-        with fsspec.open(hdf_file_path, mode="rb") as f:
-            hdf = h5py.File(f, "r")
-            hdf_path = hdf["Geometry/2D Flow Areas/"]
-            for key in hdf_path:
-                if key not in omit:
-                    flow_areas.append(key)
-                    print(key)
-        if len(flow_areas) == 1:
-            return flow_areas[0]
-        else:
-            print(
-                "Multiple 2D flow areas found within HDF file. Please select one from the returned list."
-            )
-            return flow_areas
-
-    else:
-        # open hdf from local file path
-        with h5py.File(hdf_file_path, "r") as hdf:
-            hdf_path = hdf["Geometry/2D Flow Areas/"]
-            for key in hdf_path:
-                if key not in omit:
-                    flow_areas.append(key)
-                    print(key)
-        if len(flow_areas) == 1:
-            return flow_areas[0]
-        else:
-            print(
-                "Multiple 2D flow areas found within HDF file. Please select one from the returned list."
-            )
-            return flow_areas
-
-
-def decode_hdf_projection(hdf: h5py.File):
-    """
-    Decode the projection from the HDF file
-
-    Parameters
-    ----------
-    hdf : h5py.File
-        The HDF file object
-
-    Returns
-    -------
-    str
-        The decoded projection
-    """
-    proj_wkt = hdf.attrs.get("Projection")
-    if proj_wkt is None:
-        print("No projection found in HDF file.")
-        return None
-    if type(proj_wkt) == bytes or type(proj_wkt) == np.bytes_:
-        proj_wkt = proj_wkt.decode("utf-8")
-    return CRS.from_wkt(proj_wkt)
-
-
-def get_projection(hdf_file_path: str):
-    """
-    Get the projection coordinate reference system from the HDF plan file
-
-    Parameters
-    ----------
-    hdf_file_path : str
-        The file path to the HDF file
-
-    Returns
-    -------
-    hdf_proj
-        The projection of the HDF file
-    """
-    # open hdf from s3 uri
-    if hdf_file_path.startswith("s3://"):
-        with fsspec.open(hdf_file_path, mode="rb") as f:
-            hdf = h5py.File(f, "r")
-            hdf_proj = decode_hdf_projection(hdf)
-            return hdf_proj
-    # open hdf from local file path
-    else:
-        with h5py.File(hdf_file_path, "r") as hdf:
-            hdf_proj = decode_hdf_projection(hdf)
-            return hdf_proj
-
-
-def create_xy_gdf(coords: np.array, crs: CRS):
-    """
-    Create a GeoDataFrame from x and y coordinates
-
-    Parameters
-    ----------
-    coords : np.array
-        An array of x and y coordinates
-    crs : CRS
-        The coordinate reference system of the GeoDataFrame
-    """
-    # assign to a dataframe
-    df = pd.DataFrame(coords)
-    cells = df.index
-    # rename the columns to x and y
-    df.columns = ["x", "y"]
-    # convert both columns to numeric
-    df["x"] = pd.to_numeric(df["x"])
-    df["y"] = pd.to_numeric(df["y"])
-    # convert to a spatial geopandas dataframe
-    gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df["x"], df["y"]), crs=crs)
-    gdf["Cell"] = cells
-    # drop th x and y columns
-    gdf = gdf.drop(columns=["x", "y"])
-    return gdf
-
-
-def get_cell_pts(hdf_file_path: str, domain_name: str):
-    """
-    Get the cell center points of the specified domain as a GeoDataFrame
-
-    Parameters
-    ----------
-    hdf_file_path : str
-        The file path to the HDF file
-    domain_name : str
-        The name of the domain in the HDF file
-
-    Returns
-    -------
-    gdf : gpd.GeoDataFrame
-        A geopandas dataframe with the geometry of the computational cells
-    """
-    # get the projection
-    hdf_crs = get_projection(hdf_file_path)
-    # open hdf from s3 uri
-    if hdf_file_path.startswith("s3://"):
-        with fsspec.open(hdf_file_path, mode="rb") as f:
-            hdf = h5py.File(f, "r")
-            hdf_path = hdf[
-                f"Geometry/2D Flow Areas/{domain_name}/Cells Center Coordinate"
-            ]
-            # assign to a dataframe
-            gdf = create_xy_gdf(hdf_path, hdf_crs)
-            return gdf
-    # open hdf from local file path
-    else:
-        with h5py.File(hdf_file_path, "r") as hdf:
-            # navigate to the key path
-            hdf_path = hdf[
-                f"Geometry/2D Flow Areas/{domain_name}/Cells Center Coordinate"
-            ]
-            # assign to a dataframe
-            gdf = create_xy_gdf(hdf_path, hdf_crs)
-            return gdf
-
-
-def get_perimeter(hdf_file_path: str, domain_name: str):
-    """
-    Get the perimeter of the specified domain as a GeoDataFrame
-
-    Parameters
-    ----------
-    hdf_file_path : str
-        The file path to the HDF file
-    domain_name : str
-        The name of the domain in the HDF file
-
-    Returns
-    -------
-    gdf
-        A GeoDataFrame containing the perimeter of the domain
-    """
-    # get the projection
-    hdf_crs = get_projection(hdf_file_path)
-    # open hdf from s3 uri
-    if hdf_file_path.startswith("s3://"):
-        with fsspec.open(hdf_file_path, mode="rb") as f:
-            hdf = h5py.File(f, "r")
-            perimeter_polygon = Polygon(
-                hdf[f"Geometry/2D Flow Areas/{domain_name}/Perimeter"][()]
-            )
-            gdf = gpd.GeoDataFrame(
-                {"geometry": [perimeter_polygon], "name": [domain_name]}, crs=hdf_crs
-            )
-            return gdf
-    # open hdf from local file path
-    else:
-        with h5py.File(hdf_file_path, "r") as hdf:
-            perimeter_polygon = Polygon(
-                hdf[f"Geometry/2D Flow Areas/{domain_name}/Perimeter"][()]
-            )
-            gdf = gpd.GeoDataFrame(
-                {"geometry": [perimeter_polygon], "name": [domain_name]}, crs=hdf_crs
-            )
-            return gdf
-
 
 def hdf_projection_table(plan_hdf: h5py.File):
     """
