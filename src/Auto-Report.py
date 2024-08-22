@@ -6,8 +6,8 @@ import sys
 import os
 import zipfile
 import asyncio
+import numpy as np
 import streamlit as st
-from docx import Document
 from pathlib import Path
 import warnings
 import streamlit.components.v1 as components
@@ -89,30 +89,18 @@ if __name__ == "__main__":
     with col3:
         st.subheader("Required Input:")
         st.write("File paths from the developed HEC-RAS model")
-        selected_file_source = st.radio("Select the file source:", ("Local", "S3"))
-        if selected_file_source == "Local":
-            GEOM_HDF_PATH = st.file_uploader(
-                "Geometry HDF File", type=["hdf"], accept_multiple_files=False
-            )
-            PLAN_HDF_PATH = st.file_uploader(
-                "Plan HDF File", type=["hdf"], accept_multiple_files=False
-            )
-            NLCD_PATH = st.file_uploader(
-                "NLCD File", type=["tif"], accept_multiple_files=False
-            )
-        else:
-            GEOM_HDF_PATH = st.text_input(
-                "Geometry HDF File",
-                "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/Denton/Trinity_1203_Denton/Trinity_1203_Denton.g01.hdf",
-            )
-            PLAN_HDF_PATH = st.text_input(
-                "Plan HDF File",
-                "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/Denton/Trinity_1203_Denton/Trinity_1203_Denton.p03.hdf",
-            )
-            NLCD_PATH = st.text_input(
-                "NLCD File",
-                "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/Denton/Trinity_1203_Denton/Reference/LandCover/Denton_LandCover.tif",
-            )
+        GEOM_HDF_PATH = st.text_input(
+            "Geometry HDF File",
+            "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/Denton/Trinity_1203_Denton/Trinity_1203_Denton.g01.hdf",
+        )
+        PLAN_HDF_FILES = st.multiselect(label="Plan HDF File(s)",
+                                        options=[f".p0{num}.hdf" if num < 10 else f".p{num}.hdf" for num in np.arange(1, 33, 1)],
+                                        default=None,
+                                        max_selections=6)
+        NLCD_PATH = st.text_input(
+            "NLCD File",
+            "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/Denton/Trinity_1203_Denton/Reference/LandCover/Denton_LandCover.tif",
+        )
 
     # Optional inputs
     with col4:
@@ -123,6 +111,15 @@ if __name__ == "__main__":
         DOMAIN_ID = st.text_input("Domain ID", None)
         st.write(
             "Filter to main streams that occur X times or more within the NHDPlus HR network"
+        )
+        st.write("Filter out old gages or process all available gage data.")
+        GAGE_COLLECTION_METHOD = st.radio(
+            "Gage Filter Method:",
+            [
+                "Collect all gages, old and current",
+                "Only collect gages that provide current data",
+            ],
+            index=1,
         )
         STREAM_THRESHOLD = st.number_input("Stream Threshold", 20)
         st.write("National Inventory of Dams (NID) vertical height criteria")
@@ -152,14 +149,15 @@ if __name__ == "__main__":
         st.subheader("Generate Report")
         st.write("Click the button below to run the report.")
         if st.button("Begin Report Generation"):
-            if GEOM_HDF_PATH is not None and PLAN_HDF_PATH is not None:
+            if GEOM_HDF_PATH is not None and PLAN_HDF_FILES is not None:
                 try:
                     main_auto_report(
                         GEOM_HDF_PATH,
-                        PLAN_HDF_PATH,
+                        PLAN_HDF_FILES,
                         NLCD_PATH,
                         report_file,
                         DOMAIN_ID,
+                        GAGE_COLLECTION_METHOD,
                         STREAM_THRESHOLD,
                         WSE_ERROR_THRESHOLD,
                         NUM_BINS,
