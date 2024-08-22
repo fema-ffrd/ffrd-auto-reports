@@ -260,7 +260,7 @@ def get_nlcd_data(model_perimeter: gpd.GeoDataFrame, resolution: int, year: int)
             return return_statement
 
 
-def get_usgs_stations(model_perimeter: gpd.GeoDataFrame, dates: Optional[tuple] = None):
+def get_usgs_stations(model_perimeter: gpd.GeoDataFrame, variable_type: str, dates: Optional[tuple] = None):
     """
     Get the USGS gage stations within the model perimeter
 
@@ -268,6 +268,8 @@ def get_usgs_stations(model_perimeter: gpd.GeoDataFrame, dates: Optional[tuple] 
     ----------
     model_perimeter : gpd.GeoDataFrame
         The perimeter of the model
+    variable_type : str
+        The type of variable to retrieve (e.g., "flow", "stage")
     dates : tuple
         The start and end dates for the gage station data retrieval
 
@@ -281,13 +283,16 @@ def get_usgs_stations(model_perimeter: gpd.GeoDataFrame, dates: Optional[tuple] 
 
     # Get the bounding box of the model perimeter
     bbox = tuple(model_perimeter.bounds.values[0])  # (minx, miny, maxx, maxy)
-
+    if variable_type is "flow":
+        parameter_cd = "00060"
+    elif variable_type is "stage":
+        parameter_cd = "00065"
     # Query gage stations with daily values
     query_dv = {
         "bBox": ",".join(f"{b:.06f}" for b in bbox),
         "hasDataTypeCd": "dv",
         "outputDataTypeCd": "dv",
-        "parameterCd": "00060",
+        "parameterCd": parameter_cd,
     }
     info_box_dv = nwis.get_info(query_dv)
 
@@ -296,7 +301,7 @@ def get_usgs_stations(model_perimeter: gpd.GeoDataFrame, dates: Optional[tuple] 
         "bBox": ",".join(f"{b:.06f}" for b in bbox),
         "hasDataTypeCd": "iv",
         "outputDataTypeCd": "iv",
-        "parameterCd": "00060",
+        "parameterCd": parameter_cd,
     }
     info_box_iv = nwis.get_info(query_iv)
 
