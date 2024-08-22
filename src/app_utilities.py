@@ -11,6 +11,7 @@ import shutil
 from datetime import datetime
 import zipfile
 import streamlit as st
+from dotenv import load_dotenv
 
 # Functions ###################################################################
 
@@ -47,6 +48,16 @@ def initialize_session(root_directory: str):
     -------
     None
     """
+    load_dotenv(".env")
+    os.environ["STREAMLIT_SERVER_MAX_UPLOAD_SIZE"] = os.getenv(
+        "STREAMLIT_SERVER_MAX_UPLOAD_SIZE"
+    )
+    os.environ["STREAMLIT_SERVER_RUN_ON_SAVE"] = os.getenv(
+        "STREAMLIT_SERVER_RUN_ON_SAVE"
+    )
+    os.environ["STREAMLIT_THEME_PRIMARY_COLOR"] = os.getenv(
+        "STREAMLIT_THEME_PRIMARY_COLOR"
+    )
     # Capture the timestamp of the session: year_month_day_hour_minute_second_microsecond
     st.session_state["session_id"] = datetime.now()
     # Assign the timestamp to a string variable for the session id
