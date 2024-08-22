@@ -279,6 +279,46 @@ def get_plan_params_attrs(hdf_file_path: str):
 
     return plan_params, plan_attrs
 
+def get_plan_cell_points(hdf_file_path: str):
+    """
+    Get the cell point solution data from the plan HDF file
+
+    Parameters
+    ----------
+    hdf_file_path : str
+        The file path to the HDF file
+    
+    Returns
+    -------
+    cell_points : gpd.GeoDataFrame
+        The cell points GeoDataFrame
+    """
+    # Open the HDF file from the S3 bucket
+    if hdf_file_path.startswith("s3://"):
+        # initialize the S3 keys
+        try:
+            init_s3_keys()
+            plan_hdf = RasPlanHdf.open_uri(hdf_file_path)
+        except Exception as e:
+            raise ValueError(
+                f"Error initializing the S3 keys. Check your AWS credentials. {e}"
+            )
+    else:
+        # Open the HDF file from the local file path
+        plan_hdf = RasPlanHdf(hdf_file_path)
+
+    # Get the mesh cell points
+    try:
+        cell_points = plan_hdf.mesh_cell_points()
+    except Exception as e:
+        # If the mesh cell points are not available, create an empty GeoDataFrame
+        print(f"Error getting the mesh cell points: {e}")
+        print("Creating an empty GeoDataFrame for the cell points")
+        cell_points = gpd.GeoDataFrame(
+            [], columns=["x", "y"], geometry=[], crs="EPSG:4326"
+        )
+
+    return cell_points
 
 def get_bulk_hdf_plan(hdf_file_path: str, input_domain_id: str):
     """
