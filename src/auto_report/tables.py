@@ -54,6 +54,7 @@ def fill_gage_table(report_keywords: dict, df_gages_usgs: pd.DataFrame):
     report_keywords : dict
         Updated dictionary containing the report keywords.
     """
+    df_gages_usgs = df_gages_usgs.reset_index(drop=True)
     nwis = NWIS()
     for idx, row in df_gages_usgs.iterrows():
         station_id = row["site_no"]  # 08059590
@@ -143,3 +144,120 @@ def fill_computation_settings_table(
     report_keywords["table09_output_interval"] = plan_attrs["Base Output Interval"]
 
     return report_keywords
+
+def evaluate_metrics(x):
+    """
+    Evaluate the calibration metrics according to the USACE guidelines
+    
+    Parameters
+    ----------
+    x : pd.DataFrame
+        DataFrame containing the calibration metrics. Columns include NSE, RSR, PBIAS, and R2. Indeces are the gage IDs.
+
+    Returns
+    -------
+    df : pd.DataFrame
+        DataFrame containing the evaluation of the calibration metrics. Columns include NSE, RSR, PBIAS, and R2. Indeces are the gage IDs.
+    """
+    # make a copy of the dataframe
+    df = x.copy()
+    df["R2"] = df["R2"].apply(
+        lambda x: (
+            "Very Good"
+            if x > 0.65 and x <= 1.0
+            else (
+                "Good"
+                if x > 0.55 and x <= 0.65
+                else (
+                    "Satisfactory"
+                    if x > 0.4 and x <= 0.55
+                    else "Unsatisfactory"
+                )
+            )
+        )
+    )
+    df["NSE"] = df["NSE"].apply(
+        lambda x: (
+            "Very Good"
+            if x > 0.65 and x <= 1.0
+            else (
+                "Good"
+                if x > 0.55 and x <= 0.65
+                else (
+                    "Satifactory"
+                    if x > 0.4 and x <= 0.55
+                    else "Unsatisfactory"
+                )
+            )
+        )
+    )
+    df["RSR"] = df["RSR"].apply(
+        lambda x: (
+            "Very Good"
+            if x > 0 and x <= 0.6
+            else (
+                "Good"
+                if x > 0.6 and x <= 0.7
+                else (
+                    "Satisfactory"
+                    if x > 0.7 and x <= 0.8
+                    else "Unsatisfactory"
+                )
+            )
+        )
+    )
+    df["PBIAS"] = df["PBIAS"].apply(
+        lambda x: (
+            "Very Good"
+            if x <= 15
+            else (
+                "Good"
+                if x >= 15 and x < 20
+                else (
+                    "Satifactory"
+                    if x >= 20 and x < 30
+                    else "Unsatisfactory"
+                )
+            )
+        )
+    )
+    return df
+
+def fill_calibration_metrics_table(report_keywords: dict, plan_index: int, metrics_df: pd.DataFrame):
+    """
+    Update the report_keywords dictionary with the values from the metrics_df DataFrame.
+
+    Parameters
+    ----------
+    report_keywords : dict
+        Dictionary containing the report keywords.
+    plan_index : int
+        Index of the plan. One of [1, 2, 3, 4, 5, 6].
+    metrics_df : pd.DataFrame
+        DataFrame containing the calibration metrics. Columns include NSE, RSR, PBIAS, and R2. Indeces are the gage IDs.
+
+    Returns
+    -------
+    report_keywords : dict
+        Updated dictionary containing the report keywords.
+    """
+    row_index = 1
+    metrics_df = metrics_df.round(2)
+    for gage_id, row in metrics_df.iterrows():
+        report_keywords[f"plan0{plan_index}_gage0{row_index}"] = gage_id
+        report_keywords[f"plan0{plan_index}_gage0{row_index}_flow_nse"] = str(row["NSE"])
+        report_keywords[f"plan0{plan_index}_gage0{row_index}_flow_rsr"] = str(row["RSR"])
+        report_keywords[f"plan0{plan_index}_gage0{row_index}_flow_pbias"] = str(row["PBIAS"])
+        report_keywords[f"plan0{plan_index}_gage0{row_index}_flow_r2"] = str(row["R2"])
+        row_index = row_index + 1
+
+    row_index = 1
+    eval_df = evaluate_metrics(metrics_df)
+    for gage_id, row in eval_df.iterrows():
+        report_keywords[f"plan0{plan_index}_gage0{row_index}_flow_nse_eval"] = row["NSE"]
+        report_keywords[f"plan0{plan_index}_gage0{row_index}_flow_rsr_eval"] = row["RSR"]
+        report_keywords[f"plan0{plan_index}_gage0{row_index}_flow_pbias_eval"] = row["PBIAS"]
+        report_keywords[f"plan0{plan_index}_gage0{row_index}_flow_r2_eval"] = row["R2"]
+        row_index = row_index + 1
+    return report_keywords
+
