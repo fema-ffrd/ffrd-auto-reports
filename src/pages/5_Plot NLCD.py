@@ -39,23 +39,14 @@ if __name__ == "__main__":
 
     st.subheader("Required Input")
     st.write("File paths from the developed HEC-RAS model")
-    selected_file_source = st.radio("Select the file source:", ("Local", "S3"))
-    if selected_file_source == "Local":
-        GEOM_HDF_PATH = st.file_uploader(
-            "Geometry HDF File", type=["hdf"], accept_multiple_files=False
-        )
-        NLCD_PATH = st.file_uploader(
-            "NLCD .tif File", type=["tif"], accept_multiple_files=False
-        )
-    else:
-        GEOM_HDF_PATH = st.text_input(
-            "Geometry HDF File",
-            "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/Denton/Trinity_1203_Denton/Trinity_1203_Denton.g01.hdf",
-        )
-        NLCD_PATH = st.text_input(
-            "NLCD .tif File",
-            "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/Denton/Trinity_1203_Denton/Reference/LandCover/Denton_LandCover.tif",
-        )
+    GEOM_HDF_PATH = st.text_input(
+        "Geometry HDF File",
+        "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/Denton/Trinity_1203_Denton/Trinity_1203_Denton.g01.hdf",
+    )
+    NLCD_PATH = st.text_input(
+        "NLCD .tif File",
+        "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/Denton/Trinity_1203_Denton/Reference/LandCover/Denton_LandCover.tif",
+    )
     st.subheader("Optional Input")
     st.write(
         "The name of the 2D flow area within the HEC-RAS model. Only necessary if more than one 2D flow area is present."
