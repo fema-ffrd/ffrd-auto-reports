@@ -117,11 +117,12 @@ and in Jupyter notebooks.
 
 async def auto_report(
     hdf_geom_file_path: str,
-    hdf_plan_file_path: str,
+    hdf_plan_files: list,
     nlcd_file_path: str,
     report_file_path: str,
     report_keywords: dict,
     input_domain_id: str,
+    gage_collection_method: str,
     stream_frequency_threshold: int,
     wse_error_threshold: float,
     num_bins: int,
@@ -137,8 +138,8 @@ async def auto_report(
     ----------
     hdf_geom_file_path : str
         The path to the geometry HDF file
-    hdf_plan_file_path : str
-        The path to the plan HDF file
+    hdf_plan_files : list
+        A list of extensions to the plan HDF files
     nlcd_file_path : str
         The path to the NLCD file
     report_file_path : str
@@ -147,6 +148,8 @@ async def auto_report(
         The keywords to fill in the report
     input_domain_id : str
         Optional input for the domain ID
+    gage_collection_method : str
+        The method for collecting the gages
     stream_frequency_threshold : int
         The threshold frequency for the stream names. Ex: filter to streams whose
         name occurs 20 times or more within the NHDPlus HR network.
@@ -189,16 +192,18 @@ async def auto_report(
         proj_table,
     ) = get_bulk_hdf_geom(hdf_geom_file_path, input_domain_id)
 
-    # Get the HDF plan data
-    if active_streamlit:
-        st.write("Step 2 / 12")
-        st.write("Processing for the HDF plan data...")
-    else:
-        print("Step 2 / 12")
-        print("Processing for the HDF plan data...")
-    cell_points, plan_params, plan_attrs = get_bulk_hdf_plan(
-        hdf_plan_file_path, input_domain_id
-    )
+    plan_hdf_paths = [hdf_geom_file_path.split(".")[0] + plan for plan in hdf_plan_files]
+
+    # # Get the HDF plan data
+    # if active_streamlit:
+    #     st.write("Step 2 / 12")
+    #     st.write("Processing for the HDF plan data...")
+    # else:
+    #     print("Step 2 / 12")
+    #     print("Processing for the HDF plan data...")
+    # cell_points, plan_params, plan_attrs = get_bulk_hdf_plan(
+    #     hdf_plan_file_path, input_domain_id
+    # )
 
     # Collect all USGS gages located within the perimeter boundary
     if active_streamlit:
@@ -208,13 +213,18 @@ async def auto_report(
         print("Step 3 / 12")
         print("Processing for USGS gage metadata...")
     try:
-        df_gages_usgs = get_usgs_stations(perimeter, None)
+        df_gages_usgs = get_usgs_stations(perimeter, "flow", None)
         report_keywords[
             "Section01_GageSummary_Txt"
         ] = f"""
         There are {len(df_gages_usgs)} U.S. Geological Survey (USGS) stream gages maintained within
         this modeling domain.
         """
+        if gage_collection_method == "Only collect gages that provide current data":
+            end_date = df_gages_usgs.end_date.max().strftime("%Y-%m-%d")
+            df_gages_usgs = df_gages_usgs[df_gages_usgs["end_date"] == end_date]
+        else:
+            pass
     except Exception as e:
         """
         403 Client Error: You are being blocked by the USGS API due to too many requests.
@@ -359,68 +369,63 @@ async def auto_report(
         st.error(f"Error generating figure: {e}")
         report_document = report_document
         report_keywords = report_keywords
-    # Generate the max WSE errors figure
-    if active_streamlit:
-        st.write("Step 10 / 12")
-        st.write("Processing for the max WSE errors...")
-    else:
-        print("Step 10 / 12")
-        print("Processing for the max WSE errors...")
-    try:
-        report_document, report_keywords = plot_wse_errors(
-            cell_points,
-            wse_error_threshold,
-            num_bins,
-            domain_id,
-            session_data_dir,
-            report_document,
-            report_keywords,
-        )
-    except Exception as e:
-        st.error(f"Error generating figure: {e}")
-        report_document = report_document
-        report_keywords = report_keywords
-    # Generate the WSE time to peak figure
-    if active_streamlit:
-        st.write("Step 11 / 12")
-        st.write("Processing for the WSE time to peak...")
-    else:
-        print("Step 11 / 12")
-        print("Processing for the WSE time to peak...")
-    try:
-        report_document, report_keywords = plot_wse_ttp(
-            cell_points,
-            num_bins,
-            domain_id,
-            session_data_dir,
-            report_document,
-            report_keywords,
-        )
-    except Exception as e:
-        st.error(f"Error generating figure: {e}")
-        report_document = report_document
-        report_keywords = report_keywords
+
+    # Generate the hydrographs for the calibration
     if len(df_gages_usgs) > 0:
-        # Generate the calibration hydrograph figure(s)
         if active_streamlit:
-            st.write("Step 12 / 12")
+            st.write("Step 10 / 12")
             st.write("Processing for the calibration hydrographs...")
         else:
-            print("Step 12 / 12")
+            print("Step 10 / 12")
             print("Processing for the calibration hydrographs...")
-        try:
+        for plan_index, plan in enumerate(plan_hdf_paths):
+            plan_index = plan_index + 1
             report_document, report_keywords = plot_hydrographs(
-                hdf_plan_file_path,
+                plan,
                 df_gages_usgs,
                 domain_id,
                 session_data_dir,
+                plan_index,
                 report_document,
                 report_keywords,
             )
-        except Exception as e:
-            st.error(f"Error generating figure(s): {e}")
-            report_document = report_document
-            report_keywords = report_keywords
+
+    # Generate the max WSE errors figure
+    if active_streamlit:
+        st.write("Step 11 / 12")
+        st.write("Processing for the max WSE errors...")
+    else:
+        print("Step 11 / 12")
+        print("Processing for the max WSE errors...")
+    for plan_index, plan in enumerate(plan_hdf_paths):
+        plan_index = plan_index + 1
+        report_document, report_keywords = plot_wse_errors(
+            plan,
+            wse_error_threshold,
+            num_bins,
+            session_data_dir,
+            plan_index,
+            report_document,
+            report_keywords
+            )
+
+    # # Generate the WSE time to peak figure
+    if active_streamlit:
+        st.write("Step 12 / 12")
+        st.write("Processing for the WSE time to peak...")
+    else:
+        print("Step 12 / 12")
+        print("Processing for the WSE time to peak...")
+    for plan_index, plan in enumerate(plan_hdf_paths):
+        plan_index = plan_index + 1
+        report_document, report_keywords = plot_wse_ttp(
+            plan,
+            num_bins,
+            session_data_dir,
+            plan_index,
+            report_document,
+            report_keywords,
+        )
 
     ####################################################################################################
     # Tables ###########################################################################################
@@ -435,12 +440,11 @@ async def auto_report(
     # Update Table 7: Levees within Modeling Unit
     # Update Table 8: Boundary Conditions within Modeling Unit
     # Update Table 9: Two-Dimensional Computational Solver Tolerances and Settings
-    report_keywords = fill_computation_settings_table(
-        report_keywords, plan_params, plan_attrs
-    )
+    # report_keywords = fill_computation_settings_table(
+    #     report_keywords, plan_params, plan_attrs
+    # )
     # Update Table 11: Hydrograph Calibration Summary
     # Update Table 12: Assigned Roughness within Modeling Unit
-    # Update Table 13: Calibration Metrics
 
     ####################################################################################################
     # Save #############################################################################################
@@ -465,10 +469,11 @@ async def auto_report(
 
 def main_auto_report(
     hdf_geom_file_path: str,
-    hdf_plan_file_path: str,
+    hdf_plan_files: list,
     nlcd_file_path: str,
     report_file_path: str,
     input_domain_id: str,
+    gage_collection_method: str,
     stream_frequency_threshold: int,
     wse_error_threshold: float,
     num_bins: int,
@@ -484,14 +489,16 @@ def main_auto_report(
     ----------
     hdf_geom_file_path : str
         The path to the geometry HDF file
-    hdf_plan_file_path : str
-        The path to the plan HDF file
+    hdf_plan_files : list
+        List of extensions to the plan HDF files
     nlcd_file_path : str
         The path to the NLCD file
     report_file_path : str
         The path to the template report file
     input_domain_id : str
         Optional input for the domain ID
+    gage_collection_method : str
+        The method for collecting the gages
     stream_frequency_threshold : int
         The threshold frequency for the stream names. Ex: filter to streams whose
         name occurs 20 times or more within the NHDPlus HR network.
@@ -522,11 +529,12 @@ def main_auto_report(
         asyncio.run(
             auto_report(
                 hdf_geom_file_path,
-                hdf_plan_file_path,
+                hdf_plan_files,
                 nlcd_file_path,
                 report_file_path,
                 report_keywords,
                 input_domain_id,
+                gage_collection_method,
                 stream_frequency_threshold,
                 wse_error_threshold,
                 num_bins,
@@ -541,11 +549,12 @@ def main_auto_report(
         asyncio.create_task(
             auto_report(
                 hdf_geom_file_path,
-                hdf_plan_file_path,
+                hdf_plan_files,
                 nlcd_file_path,
                 report_file_path,
                 report_keywords,
                 input_domain_id,
+                gage_collection_method,
                 stream_frequency_threshold,
                 wse_error_threshold,
                 num_bins,
