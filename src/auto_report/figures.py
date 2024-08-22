@@ -36,13 +36,16 @@ from hy_river import (
     get_nwis_streamflow,
     filter_nid,
 )
-from hdf_utils import get_model_perimeter
+from hdf_utils import get_model_perimeter, get_plan_cell_points
+from metrics import calc_metrics
+from tables import fill_calibration_metrics_table
 
 warnings.filterwarnings("ignore")
 
 # assign a global font size for the plots
 plt.rcParams.update({"font.size": 16})
-
+# Set the display option for floating-point numbers to show only 3 decimal places
+pd.options.display.float_format = '{:.3f}'.format
 # Functions ###################################################################
 
 
@@ -1165,11 +1168,11 @@ def plot_hist_cdf(
 
 
 def plot_wse_errors(
-    cell_points: gpd.GeoDataFrame,
+    hdf_plan_file_path: str,
     wse_error_threshold: float,
     num_bins: int,
-    domain_name: str,
     root_dir: str,
+    plan_index: Optional[int] = None,
     report_document: Optional[Document] = None,
     report_keywords: Optional[dict] = None,
 ):
@@ -1179,16 +1182,16 @@ def plot_wse_errors(
 
     Parameters
     ----------
-    cell_points : gpd.GeoDataFrame
-        The cell points GeoDataFrame
+    hdf_plan_file_path : str
+        The path to the HDF plan file
     wse_error_threshold: float
         The threshold for the WSE error
     num_bins: int
         The number of bins for the histogram
-    domain_name : str
-        The name of the domain
     root_dir : str
         The root directory
+    plan_index: int
+        The index of the plan to use
     report_document : Docx Document
         The document to modify
     report_keywords : dict
@@ -1205,7 +1208,9 @@ def plot_wse_errors(
         report_keywords : dict
             The updated values for the keywords
     """
-
+    # Get the mesh cell points and domain name
+    cell_points = get_plan_cell_points(hdf_plan_file_path)
+    domain_name = cell_points["mesh_name"].unique()[0]
     # Generate the Figure for the WSE Error QC
     image_path = os.path.join(root_dir, f"{domain_name}_figure_wse_errors.png")
 
@@ -1213,19 +1218,19 @@ def plot_wse_errors(
     if len(cell_points) == 0:
         print("No cells found in the HDF file")
         output_message = "No cells found in the HDF file"
-        if report_document is None and report_keywords is None:
+        if report_document is None and report_keywords is None and plan_index is None:
             return output_message
         else:
-            report_keywords["figure_wse_errors"] = "No cells found in the HDF file"
+            report_keywords[f"plan0{plan_index}_figure_wse_errors"] = "No cells found in the HDF file"
             return report_document, report_keywords
     elif len(cell_points[cell_points["max_ws_err"] > 0]) == 0:
         print("No cells with WSE errors greater than zero")
         output_message = "No cells with WSE errors greater than zero"
-        if report_document is None and report_keywords is None:
+        if report_document is None and report_keywords is None and plan_index is None:
             return output_message
         else:
             report_keywords[
-                "figure_wse_errors"
+                f"plan0{plan_index}_figure_wse_errors"
             ] = "No cells with WSE errors greater than zero"
             return report_document, report_keywords
     else:
@@ -1246,29 +1251,29 @@ def plot_wse_errors(
             num_bins,
             image_path,
         )
-        if report_document is None and report_keywords is None:
+        if report_document is None and report_keywords is None and plan_index is None:
             return image_path
         else:
             # Search for the keyword within the document and add the image above it
             report_document = add_image_to_keyword(
-                report_document, "«figure_wse_errors»", image_path
+                report_document, f"«plan0{plan_index}_figure_wse_errors»", image_path
             )
             os.remove(image_path)
             # Update the report text
             report_keywords[
-                "figure_wse_errors"
+                f"plan0{plan_index}_figure_wse_errors"
             ] = f"""Maximum Water Surface Elevation Error Spatial Distribution. Among the {num_cells:,} wetted cells, approximately {num_cells_exceeding_threshold:,} cells have errors exceeding a threshold of {wse_error_threshold:.2f}-feet, with a maximum recorded error of {max_wse_error:.1f}-feet.
             """
             return report_document, report_keywords
 
 
 def plot_wse_ttp(
-    cell_points: gpd.GeoDataFrame,
+    hdf_plan_file_path: str,
     num_bins: int,
-    domain_name: str,
     root_dir: str,
-    report_document: Optional[Document],
-    report_keywords: Optional[dict],
+    plan_index: Optional[int] = None,
+    report_document: Optional[Document] = None,
+    report_keywords: Optional[dict] = None,
 ):
     """
     Generate the Appendix A Figure 10 for the report
@@ -1276,14 +1281,14 @@ def plot_wse_ttp(
 
     Parameters
     ----------
-    cell_points : gpd.GeoDataFrame
-        The cell points GeoDataFrame
+    hdf_plan_file_path : str
+        The path to the HDF plan file
     num_bins: int
         The number of bins for the histogram
-    domain_name : str
-        The name of the domain
     root_dir : str
         The root directory
+    plan_index: int
+        The index of the plan to use
     report_document : Docx Document
         The document to modify
     report_keywords : dict
@@ -1300,7 +1305,9 @@ def plot_wse_ttp(
         report_keywords : dict
             The updated values for the keywords
     """
-
+    # Get the mesh cell points and domain name
+    cell_points = get_plan_cell_points(hdf_plan_file_path)
+    domain_name = cell_points["mesh_name"].unique()[0]
     # Generate the Figure for the WSE Error QC
     image_path = os.path.join(root_dir, f"{domain_name}_figure_wse_ttp.png")
 
@@ -1308,10 +1315,10 @@ def plot_wse_ttp(
     if len(cell_points) == 0:
         print("No cells found in the HDF file")
         output_message = "No cells found in the HDF file"
-        if report_document is None and report_keywords is None:
+        if report_document is None and report_keywords is None and plan_index is None:
             return output_message
         else:
-            report_keywords["figure_wse_ttp"] = "No cells found in the HDF file"
+            report_keywords[f"plan0{plan_index}_figure_wse_ttp"] = "No cells found in the HDF file"
             return report_document, report_keywords
 
     # Determine the global min time to peak for the simulation start time
@@ -1326,11 +1333,11 @@ def plot_wse_ttp(
     if len(ttp[ttp["ttp_hrs"] > 0]) == 0:
         print("No cells with time to peak greater than zero")
         output_message = "No cells with time to peak greater than zero"
-        if report_document is None and report_keywords is None:
+        if report_document is None and report_keywords is None and plan_index is None:
             return output_message
         else:
             report_keywords[
-                "figure_wse_ttp"
+                f"plan0{plan_index}_figure_wse_ttp"
             ] = "No cells with time to peak greater than zero"
             return report_document, report_keywords
     else:
@@ -1351,17 +1358,17 @@ def plot_wse_ttp(
             num_bins,
             image_path,
         )
-        if report_document is None and report_keywords is None:
+        if report_document is None and report_keywords is None and plan_index is None:
             return image_path
         else:
             # Search for the keyword within the document and add the image above it
             report_document = add_image_to_keyword(
-                report_document, "«figure_wse_ttp»", image_path
+                report_document, f"«plan0{plan_index}_figure_wse_ttp»", image_path
             )
             os.remove(image_path)
             # Update the report text
             report_keywords[
-                "figure_wse_ttp"
+                f"plan0{plan_index}_figure_wse_ttp"
             ] = f"""Water Surface Elevation Time-to-Peak Spatial Distribution. The full duration for the model simulation is {ttp_max:.0f} hours. Among the {num_cells:,} wetted cells, at least {num_cells_exceeding_threshold:,} was still increasing in water surface elevation during the final hour of the simulation.
             """
             return report_document, report_keywords
@@ -1389,12 +1396,89 @@ def find_timstep_freq(df: pd.DataFrame):
         ts_freq = df.index[1] - df.index[0]
         return ts_freq
 
+def format_datetime(qobs_df: pd.DataFrame, qsim_df: pd.DataFrame):
+    """
+    Format the datetime index of the observed and modeled datasets
+    and resample the data to the same timestep frequency.
+
+    Parameters
+    ----------
+    qobs_df : pd.DataFrame
+        The observed data DataFrame
+    qsim_df : pd.DataFrame
+        The modeled data DataFrame
+    
+    Returns
+    -------
+    qobs_df : pd.DataFrame
+        The formatted observed data DataFrame
+    qsim_df : pd.DataFrame
+        The formatted modeled data DataFrame
+    """
+    # Determine the frequency of the data
+    qobs_freq = find_timstep_freq(qobs_df)
+    qsim_freq = find_timstep_freq(qsim_df)
+
+    # Resample the data to the same timestep frequency of the model
+    if qobs_freq < qsim_freq:
+        print(
+            f"Resampling the observed data from {qobs_freq} to {qsim_freq}"
+        )
+        qobs_df = qobs_df.resample(qsim_freq).mean()
+        if qsim_freq.seconds == 60:
+            print("Data is at a minute timestep")
+            qobs_df.index = pd.to_datetime(qobs_df.index, format="%Y-%m-%d %H:%M")
+            qsim_df.index = pd.to_datetime(qsim_df.index, format="%Y-%m-%d %H:%M")
+        elif qsim_freq.seconds == 3600:
+            print("Data is at an hourly timestep")
+            qobs_df.index = pd.to_datetime(qobs_df.index, format="%Y-%m-%d %H")
+            qsim_df.index = pd.to_datetime(qsim_df.index, format="%Y-%m-%d %H")
+        elif qsim_freq.days == 1:
+            print("Data is at a daily timestep")
+            qobs_df.index = pd.to_datetime(qobs_df.index.date, format="%Y-%m-%d")
+            qsim_df.index = pd.to_datetime(qsim_df.index.date, format="%Y-%m-%d")
+    elif qobs_freq > qsim_freq:
+        print(
+            f"Resampling the modeled data from {qsim_freq} to {qobs_freq}"
+        )
+        qsim_df = qsim_df.resample(qobs_freq).mean()
+        if qobs_freq.seconds == 60:
+            print("Data is at a minute timestep")
+            qobs_df.index = pd.to_datetime(qobs_df.index, format="%Y-%m-%d %H:%M")
+            qsim_df.index = pd.to_datetime(qsim_df.index, format="%Y-%m-%d %H:%M")
+        elif qobs_freq.seconds == 3600:
+            print("Data is at an hourly timestep")
+            qobs_df.index = pd.to_datetime(qobs_df.index, format="%Y-%m-%d %H")
+            qsim_df.index = pd.to_datetime(qsim_df.index, format="%Y-%m-%d %H")
+        elif qobs_freq.days == 1:
+            print("Data is at a daily timestep")
+            qobs_df.index = pd.to_datetime(qobs_df.index.date, format="%Y-%m-%d")
+            qsim_df.index = pd.to_datetime(qsim_df.index.date, format="%Y-%m-%d")
+    else:
+        print(
+            f"Observed and modeled data are at the same timestep frequency of {qobs_freq}"
+        )
+        if qobs_freq.seconds == 60:
+            print("Data is at a minute timestep")
+            qobs_df.index = pd.to_datetime(qobs_df.index, format="%Y-%m-%d %H:%M")
+            qsim_df.index = pd.to_datetime(qsim_df.index, format="%Y-%m-%d %H:%M")
+        elif qobs_freq.seconds == 3600:
+            print("Data is at an hourly timestep")
+            qobs_df.index = pd.to_datetime(qobs_df.index, format="%Y-%m-%d %H")
+            qsim_df.index = pd.to_datetime(qsim_df.index, format="%Y-%m-%d %H")
+        elif qobs_freq.days == 1:
+            print("Data is at a daily timestep")
+            qobs_df.index = pd.to_datetime(qobs_df.index.date, format="%Y-%m-%d")
+            qsim_df.index = pd.to_datetime(qsim_df.index.date, format="%Y-%m-%d")
+    
+    return qobs_df, qsim_df
 
 def plot_hydrographs(
     hdf_plan_file_path: str,
     df_gages_usgs: gpd.GeoDataFrame,
     domain_name: str,
     root_dir: str,
+    plan_index: Optional[int] = None,
     report_document: Optional[Document] = None,
     report_keywords: Optional[dict] = None,
 ):
@@ -1411,6 +1495,8 @@ def plot_hydrographs(
         The name of the domain
     root_dir : str
         The root directory
+    plan_index : int
+        The index of the plan HDF file being used. One of [1, 2, 3, 4, 5, 6]
     report_document : Docx Document
         The document to modify
     report_keywords : dict
@@ -1429,7 +1515,10 @@ def plot_hydrographs(
     """
 
     # Open the HDF plan file for the reference line data
-    plan_hdf = RasPlanHdf.open_uri(hdf_plan_file_path)
+    try:
+        plan_hdf = RasPlanHdf.open_uri(hdf_plan_file_path)
+    except Exception as e:
+        raise FileNotFoundError(f"The provided HDF plan file {hdf_plan_file_path} does not exist. Please verify the file path.") from e
     ref_lines = plan_hdf.reference_lines()
     ref_lines = ref_lines.to_crs(epsg=4326)  # convert to EPSG:4326
     ref_lines_ds = plan_hdf.reference_lines_timeseries_output()
@@ -1438,25 +1527,29 @@ def plot_hydrographs(
     start_time = plan_attrs["Simulation Start Time"]
     end_time = plan_attrs["Simulation End Time"]
     dates = (start_time, end_time)
+    path_start_date = start_time.strftime("%Y-%m-%d")
+    path_end_date = end_time.strftime("%Y-%m-%d")
     print(f"Calibration period: {start_time} to {end_time}")
 
     # Query the NWIS server for streamflow at the gage locations
     qobs_ds = get_nwis_streamflow(df_gages_usgs, dates)
     if isinstance(qobs_ds, str):
-        if report_document is None and report_keywords is None:
+        if report_document is None and report_keywords is None and plan_index is None:
             print(f"Error generating figure: {qobs_ds}")
             output_message = f"Error generating figure: {qobs_ds}"
             return output_message
         else:
             print(f"Error generating figure: {qobs_ds}")
-            report_keywords["figure_gage_cal"] = f"Error generating figure: {qobs_ds}"
+            keyword_key = f"plan0{plan_index}_figure_gage_flow"
+            report_keywords[keyword_key] = f"Error generating figure: {qobs_ds}"
             return report_document, report_keywords
 
     # Units of degrees for EPSG:4326 to buffer outwards from the reference line location
     buffer_increment = 0.001  # Ex: 0.001 degrees is approximately 100 meters
     # Loop through each reference line within the model
     print("Plotting hydrographs for each reference line")
-    image_path_list = []
+    images_dict = {}
+    metrics_list = []
     for idx, line_id in enumerate(ref_lines.refln_id.values):
         # Intersect the gages with the reference lines
         gage_df = df_gages_usgs[
@@ -1483,7 +1576,6 @@ def plot_hydrographs(
                     .to_frame()
                 )
                 qsim_df.columns = ["Modeled"]
-                qsim_freq = find_timstep_freq(qsim_df)
 
                 # Observed streamflow
                 qobs_df = (
@@ -1495,29 +1587,19 @@ def plot_hydrographs(
                 qobs_df["Observed"] = (
                     qobs_df["Observed"] * 35.3147
                 )  # Convert from cms to cfs
-                qobs_freq = find_timstep_freq(qobs_df)
 
                 # Resample the data to the same timestep frequency of the model
-                if qobs_freq < qsim_freq:
-                    print(
-                        f"Resampling the observed data from {qobs_freq} to {qsim_freq}"
-                    )
-                    qobs_df = qobs_df.resample(qsim_freq).mean()
-                elif qobs_freq > qsim_freq:
-                    print(
-                        f"Resampling the modeled data from {qsim_freq} to {qobs_freq}"
-                    )
-                    qsim_df = qsim_df.resample(qobs_freq).mean()
-                else:
-                    print(
-                        f"Observed and modeled data are at the same timestep frequency of {qobs_freq}"
-                    )
+                qobs_df, qsim_df = format_datetime(qobs_df, qsim_df)
 
+                # Calculate the metrics between the observed and modeled streamflow
+                q_df = pd.merge(qobs_df, qsim_df, left_index=True, right_index=True).dropna()
+                qobs_df, qsim_df = None, None
+                metrics = calc_metrics(q_df, usgs_site_id)
                 # Generate the figure
                 fig, ax = plt.subplots(figsize=(10, 10))
                 # Plot the modeled vs observed streamflow
-                qobs_df.plot(ax=ax, color="blue", label="Observed", alpha=0.7)
-                qsim_df.plot(ax=ax, color="red", label="Modeled", alpha=0.7)
+                q_df["Observed"].plot(ax=ax, color="blue", label="Observed", alpha=0.7)
+                q_df["Modeled"].plot(ax=ax, color="red", label="Modeled", alpha=0.7)
                 # Add grid lines
                 ax.grid()
                 # Add a legend
@@ -1532,19 +1614,21 @@ def plot_hydrographs(
                     ticker.FuncFormatter(lambda x, p: format(int(x), ","))
                 )
                 # Save the figure
-                image_path = os.path.join(
-                    root_dir, f"{domain_name}_figure_gage_cal_{usgs_site_id}.png"
-                )
+                path = f"{domain_name}_{usgs_site_id}_plan0{plan_index}_.png"
+                print(f"Saving figure: {path}")
+                image_path = os.path.join(root_dir, path)
                 fig.savefig(image_path, bbox_inches="tight")
                 plt.close(fig)
-                if report_document is None and report_keywords is None:
-                    image_path_list.append(image_path)
+                if report_document is None and report_keywords is None and plan_index is None:
+                    images_dict[station_id] = image_path
+                    metrics_list.append(metrics)
                 else:
                     # Search for the keyword within the document and add the image above it
                     report_document = add_image_to_keyword(
-                        report_document, "«figure_gage_cal»", image_path
+                        report_document, f"«plan0{plan_index}_figure_gage_flow»", image_path
                     )
                     os.remove(image_path)
+                    metrics_list.append(metrics)
         # Non-trivial scenario: no rows returned indicating no gages are within the buffer distance
         # Need to buffer out the reference line until the closest gage (within reason) is found
         elif len(gage_df) == 0:
@@ -1585,7 +1669,6 @@ def plot_hydrographs(
                         .to_frame()
                     )
                     qsim_df.columns = ["Modeled"]
-                    qsim_freq = find_timstep_freq(qsim_df)
 
                     # Observed streamflow
                     qobs_df = (
@@ -1597,29 +1680,19 @@ def plot_hydrographs(
                     qobs_df["Observed"] = (
                         qobs_df["Observed"] * 35.3147
                     )  # Convert from cms to cfs
-                    qobs_freq = find_timstep_freq(qobs_df)
 
                     # Resample the data to the same timestep frequency of the model
-                    if qobs_freq < qsim_freq:
-                        print(
-                            f"Resampling the observed data from {qobs_freq} to {qsim_freq}"
-                        )
-                        qobs_df = qobs_df.resample(qsim_freq).mean()
-                    elif qobs_freq > qsim_freq:
-                        print(
-                            f"Resampling the modeled data from {qsim_freq} to {qobs_freq}"
-                        )
-                        qsim_df = qsim_df.resample(qobs_freq).mean()
-                    else:
-                        print(
-                            f"Observed and modeled data are at the same timestep frequency of {qobs_freq}"
-                        )
+                    qobs_df, qsim_df = format_datetime(qobs_df, qsim_df)
 
+                    # Calculate the metrics between the observed and modeled streamflow
+                    q_df = pd.merge(qobs_df, qsim_df, left_index=True, right_index=True).dropna()
+                    qobs_df, qsim_df = None, None
+                    metrics = calc_metrics(q_df, usgs_site_id)
                     # Generate the figure
                     fig, ax = plt.subplots(figsize=(10, 10))
                     # Plot the modeled vs observed streamflow
-                    qobs_df.plot(ax=ax, color="blue", label="Observed", alpha=0.7)
-                    qsim_df.plot(ax=ax, color="red", label="Modeled", alpha=0.7)
+                    q_df["Observed"].plot(ax=ax, color="blue", label="Observed", alpha=0.7)
+                    q_df["Modeled"].plot(ax=ax, color="red", label="Modeled", alpha=0.7)
                     # Add grid lines
                     ax.grid()
                     # Add a legend
@@ -1635,25 +1708,34 @@ def plot_hydrographs(
                     )
                     # Save the figure
                     image_path = os.path.join(
-                        root_dir, f"{domain_name}_figure_gage_cal_{usgs_site_id}.png"
+                        root_dir, f"{domain_name}_{usgs_site_id}_{path_start_date}_{path_end_date}.png"
                     )
                     fig.savefig(image_path, bbox_inches="tight")
                     plt.close(fig)
-                    if report_document is None and report_keywords is None:
-                        image_path_list.append(image_path)
+                    if report_document is None and report_keywords is None and plan_index is None:
+                        images_dict[station_id] = image_path
+                        metrics_list.append(metrics)
                     else:
                         # Search for the keyword within the document and add the image above it
                         report_document = add_image_to_keyword(
-                            report_document, "«figure_gage_cal»", image_path
+                            report_document, f"«plan0{plan_index}_figure_gage_flow»", image_path
                         )
                         os.remove(image_path)
+                        metrics_list.append(metrics)
             elif len(gage_df) > 1:
                 raise ValueError(
                     f"{len(gage_df)} gages found within the minimum buffer distance of the reference line. {gage_df}."
                 )
-    if report_document is None and report_keywords is None:
-        return image_path_list
+    if report_document is None and report_keywords is None and plan_index is None:
+        # Combine the metrics into a single dataframe
+        metrics_df = pd.concat(metrics_list)
+        return images_dict, metrics_df
     else:
         # Update the report text
-        report_keywords["figure_gage_cal"] = "USGS Gage Calibration Plots"
-        return report_document, report_keywords
+        report_keywords[f"plan0{plan_index}_figure_gage_flow"] = "USGS Gage Flow Calibration Plots"
+        report_keywords[f"plan0{plan_index}_date"] = f"{path_start_date} to {path_end_date}"
+        # Combine all gage metrics into a single dataframe
+        metrics_df = pd.concat(metrics_list)
+        # Update the calibration metrics table in the report
+        report_keywords = fill_calibration_metrics_table(report_keywords, plan_index, metrics_df)
+        return report_document, report_keywords 
