@@ -192,18 +192,9 @@ async def auto_report(
         proj_table,
     ) = get_bulk_hdf_geom(hdf_geom_file_path, input_domain_id)
 
-    plan_hdf_paths = [hdf_geom_file_path.split(".")[0] + plan for plan in hdf_plan_files]
-
-    # # Get the HDF plan data
-    # if active_streamlit:
-    #     st.write("Step 2 / 12")
-    #     st.write("Processing for the HDF plan data...")
-    # else:
-    #     print("Step 2 / 12")
-    #     print("Processing for the HDF plan data...")
-    # cell_points, plan_params, plan_attrs = get_bulk_hdf_plan(
-    #     hdf_plan_file_path, input_domain_id
-    # )
+    plan_hdf_paths = [
+        hdf_geom_file_path.split(".")[0] + plan for plan in hdf_plan_files
+    ]
 
     # Collect all USGS gages located within the perimeter boundary
     if active_streamlit:
@@ -377,12 +368,29 @@ async def auto_report(
             st.write("Processing for the calibration hydrographs...")
         else:
             print("Step 10 / 12")
-            print("Processing for the calibration hydrographs...")
+
+        print("Processing for the flow calibration hydrographs...")
         for plan_index, plan in enumerate(plan_hdf_paths):
             plan_index = plan_index + 1
+            print('')
             report_document, report_keywords = plot_hydrographs(
                 plan,
                 df_gages_usgs,
+                "Flow",
+                domain_id,
+                session_data_dir,
+                plan_index,
+                report_document,
+                report_keywords,
+            )
+        print("Processing for the stage calibration hydrographs...")
+        for plan_index, plan in enumerate(plan_hdf_paths):
+            plan_index = plan_index + 1
+            print('')
+            report_document, report_keywords = plot_hydrographs(
+                plan,
+                df_gages_usgs,
+                "Stage",
                 domain_id,
                 session_data_dir,
                 plan_index,
@@ -406,8 +414,8 @@ async def auto_report(
             session_data_dir,
             plan_index,
             report_document,
-            report_keywords
-            )
+            report_keywords,
+        )
 
     # # Generate the WSE time to peak figure
     if active_streamlit:
@@ -436,14 +444,13 @@ async def auto_report(
     # Update Table 3: USGS Stream Gage Summary
     report_keywords = fill_gage_table(report_keywords, df_gages_usgs)
     # Update Table 6: Dams within Modeling Unit
-    report_keywords = fill_nid_dams_table(report_keywords, nid_parquet_file_path, perimeter, nid_dam_height)
+    report_keywords = fill_nid_dams_table(
+        report_keywords, nid_parquet_file_path, perimeter, nid_dam_height
+    )
+
+    #TODO
     # Update Table 7: Levees within Modeling Unit
     # Update Table 8: Boundary Conditions within Modeling Unit
-    # Update Table 9: Two-Dimensional Computational Solver Tolerances and Settings
-    # report_keywords = fill_computation_settings_table(
-    #     report_keywords, plan_params, plan_attrs
-    # )
-    # Update Table 11: Hydrograph Calibration Summary
     # Update Table 12: Assigned Roughness within Modeling Unit
 
     ####################################################################################################
