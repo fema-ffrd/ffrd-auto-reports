@@ -93,10 +93,15 @@ if __name__ == "__main__":
             "Geometry HDF File",
             "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/Denton/Trinity_1203_Denton/Trinity_1203_Denton.g01.hdf",
         )
-        PLAN_HDF_FILES = st.multiselect(label="Plan HDF File(s)",
-                                        options=[f".p0{num}.hdf" if num < 10 else f".p{num}.hdf" for num in np.arange(1, 33, 1)],
-                                        default=None,
-                                        max_selections=6)
+        PLAN_HDF_FILES = st.multiselect(
+            label="Plan HDF File(s)",
+            options=[
+                f".p0{num}.hdf" if num < 10 else f".p{num}.hdf"
+                for num in np.arange(1, 33, 1)
+            ],
+            default=None,
+            max_selections=6,
+        )
         NLCD_PATH = st.text_input(
             "NLCD File",
             "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/Denton/Trinity_1203_Denton/Reference/LandCover/Denton_LandCover.tif",
