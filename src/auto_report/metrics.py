@@ -8,6 +8,7 @@ from permetrics.regression import RegressionMetric
 
 # Functions ###################################################################
 
+
 def pbias_score(obs_values: np.array, model_values: np.array):
     """
     Calculate the Percent Bias
@@ -34,6 +35,7 @@ def pbias_score(obs_values: np.array, model_values: np.array):
     pbias_val = pbias_val * 100
     return pbias_val
 
+
 def calc_metrics(q_df: pd.DataFrame, station_id: str):
     """
     Calculate streamflow statistics
@@ -44,7 +46,7 @@ def calc_metrics(q_df: pd.DataFrame, station_id: str):
         Dataframe containing observed and modeled streamflow data
     station_id: str
         String unique identified for USGS gage
-    
+
     Returns
     -------
     stats_df : pandas dataframe
