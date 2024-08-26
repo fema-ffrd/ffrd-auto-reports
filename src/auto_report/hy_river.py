@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # Imports #####################################################################
+import io
 from typing import Optional
 import requests
 import pandas as pd
@@ -187,7 +188,7 @@ def filter_nid(
     # Filter to the points with a height greater or equal to the threshold
     nid_df = nid_df[nid_df["damHeight"] >= height_threshold]
     # Remove any dams with missing height values
-    nid_df = nid_df.dropna(subset=['damHeight'])
+    nid_df = nid_df.dropna(subset=["damHeight"])
 
     # Ensure the point data has 'latitude' and 'longitude' columns
     if "latitude" not in nid_df.columns or "longitude" not in nid_df.columns:
@@ -260,7 +261,9 @@ def get_nlcd_data(model_perimeter: gpd.GeoDataFrame, resolution: int, year: int)
             return return_statement
 
 
-def get_usgs_stations(model_perimeter: gpd.GeoDataFrame, variable_type: str, dates: Optional[tuple] = None):
+def get_usgs_stations(
+    model_perimeter: gpd.GeoDataFrame, variable_type: str, dates: Optional[tuple] = None
+):
     """
     Get the USGS gage stations within the model perimeter
 
@@ -283,10 +286,10 @@ def get_usgs_stations(model_perimeter: gpd.GeoDataFrame, variable_type: str, dat
 
     # Get the bounding box of the model perimeter
     bbox = tuple(model_perimeter.bounds.values[0])  # (minx, miny, maxx, maxy)
-    if variable_type is "flow":
-        parameter_cd = "00060"
-    elif variable_type is "stage":
-        parameter_cd = "00065"
+    if variable_type == "flow":
+        parameter_cd = "00060" # discharge in cubic feet per second
+    elif variable_type == "stage":
+        parameter_cd = "00065" # gage height in feet
     # Query gage stations with daily values
     query_dv = {
         "bBox": ",".join(f"{b:.06f}" for b in bbox),
@@ -339,41 +342,215 @@ def get_usgs_stations(model_perimeter: gpd.GeoDataFrame, variable_type: str, dat
     return df_gages_usgs.reset_index(drop=True)
 
 
-def get_nwis_streamflow(df_gages_usgs: gpd.GeoDataFrame, dates: tuple):
-    """
-    Get the streamflow data for the USGS gage stations from the NWIS server
+# def get_nwis_streamflow(df_gages_usgs: gpd.GeoDataFrame, dates: tuple):
+#     """
+#     Get the streamflow data for the USGS gage stations from the NWIS server
 
-    Parameters
-    ----------
-    df_gages_usgs : gpd.GeoDataFrame
-        The USGS gage stations metadata
-    dates : tuple
-        The start and end dates for the streamflow data retrieval
+#     Parameters
+#     ----------
+#     df_gages_usgs : gpd.GeoDataFrame
+#         The USGS gage stations metadata
+#     dates : tuple
+#         The start and end dates for the streamflow data retrieval
 
-    Returns
-    -------
-    xr.Dataset
-        The streamflow data for the USGS gage stations
-    """
-    # Create an instance of the NWIS class
-    nwis = NWIS()
-    stations = df_gages_usgs.site_no.values
-    # Get all available streamflow data within the specified date range for the gage stations
-    try:
-        qobs_ds = nwis.get_streamflow(
-            stations, dates, mmd=False, to_xarray=True, freq="iv"
-        )
-        return qobs_ds
-    except DataNotAvailableError as e:
-        print(f"Failed to get instantaneous values for the gage stations: {e}")
-        print("Attempting to get daily values instead...")
-    try:
-        qobs_ds = nwis.get_streamflow(
-            stations, dates, mmd=False, to_xarray=True, freq="dv"
-        )
-        return qobs_ds
-    except DataNotAvailableError as e:
-        return_statement = (
-            f"Failed to get daily and instantaneous values for the gage stations: {e}"
-        )
-        return return_statement
+#     Returns
+#     -------
+#     xr.Dataset
+#         The streamflow data for the USGS gage stations
+#     """
+#     # Create an instance of the NWIS class
+#     nwis = NWIS()
+#     stations = df_gages_usgs.site_no.values
+#     # Get all available streamflow data within the specified date range for the gage stations
+#     try:
+#         qobs_ds = nwis.get_streamflow(
+#             stations, dates, mmd=False, to_xarray=True, freq="iv"
+#         )
+#         return qobs_ds
+#     except DataNotAvailableError as e:
+#         print(f"Failed to get instantaneous values for the gage stations: {e}")
+#         print("Attempting to get daily values instead...")
+#     try:
+#         qobs_ds = nwis.get_streamflow(
+#             stations, dates, mmd=False, to_xarray=True, freq="dv"
+#         )
+#         return qobs_ds
+#     except DataNotAvailableError as e:
+#         return_statement = (
+#             f"Failed to get daily and instantaneous values for the gage stations: {e}"
+#         )
+#         return return_statement
+
+def get_nwis(site: str, 
+             parameter: str,
+             frequency: str,
+             start_date: str,
+             end_date: str,
+             output_format: Optional[str] = "rdb",
+             ):
+    '''retrieve instantaneous data for a usgs site, write to a file (optional, and return as a dataframe
+
+    Note: currently limits to USGS sites only, all sites (regardless of active status), and stream discharge only
+    Note: api call built from USGS api builder: https://waterservices.usgs.gov/rest/IV-Test-Tool.html
+
+    Args
+        site (str): gage id 
+        parameter (str): one of 'Flow', 'Stage', or 'Precipitation'
+        frequency (str): one of 'iv' or 'dv'
+        start_date (str): formatted to 'YYYY-MM-DD'
+        end_date (str): formatted to 'YYYY-MM-DD'
+        write_file (boolean): default to False
+        output_format (str): one of [txt, waterML-2.0, json].
+    Return
+        df (pd.DataFrame): formatted dataframe of peak data
+    '''
+
+    if parameter == 'Flow':
+        
+        param_id = '00060'
+        try:
+            # build url and make call only for USGS funded sites
+            url = f"https://waterservices.usgs.gov/nwis/{frequency}/?format={output_format}&sites={site}&startDT={start_date}&endDT={end_date}&parameterCd={param_id}&siteType=ST&agencyCd=usgs&siteStatus=all"
+            r = requests.get(url)
+
+            # check that api call worked
+            if r.status_code!=200:
+                print(f"Server response {r.status_code}: Returning None")
+                return None
+
+            # decode results
+            if output_format=='rdb':
+                df = pd.read_table(io.StringIO(r.content.decode('utf-8')), 
+                                comment='#',
+                                skip_blank_lines=True)
+                df = df.iloc[1:].copy()
+
+            if frequency == 'iv':
+                data_col_idx = 4
+            elif frequency == 'dv':
+                data_col_idx = 3
+            timestep_idx = 2
+
+            if len(df.dropna()) == 0:
+                print('No data available for the time period specified')
+                return None
+            elif df[df.columns[data_col_idx]].values[0] == 'ZFL':
+                print('Zero flow condition: Return None')
+                return None
+            elif df[df.columns[data_col_idx]].values[0] == '***':
+                print('Data temporarily unavailable for the time period specified')
+                return None
+            elif set(df['site_no'].isnull()) == {True}:
+                return None
+            
+            # format the final dataframe to represent the observed rainfall following a datetime index
+            final_df = pd.DataFrame(df[df.columns[data_col_idx]].astype('float'))
+            final_df.columns = [site]
+            final_df.index = pd.to_datetime(df[df.columns[timestep_idx]].values)
+
+            return final_df
+    
+        # when an incorrect gage number is sent to the api, we end up at usgs url (second failure mechanism)
+        except:
+            return None
+    
+    elif parameter == 'Precipitation':
+        param_id = '00045'
+        try:
+            # build url and make call for all available rain gage sites for CONUS
+            url = f"https://waterservices.usgs.gov/nwis/{frequency}/?format={output_format}&sites={site}&startDT={start_date}&endDT={end_date}&parameterCd={param_id}&siteStatus=all"
+            r = requests.get(url)
+
+            # check that api call worked
+            if r.status_code!=200:
+                print(f"Server response {r.status_code}: Returning None")
+                return None
+
+            # decode results
+            if output_format=='rdb':
+                df = pd.read_table(io.StringIO(r.content.decode('utf-8')), 
+                                comment='#',
+                                skip_blank_lines=True)
+                df = df.iloc[1:].copy()
+
+            if frequency == 'iv':
+                data_col_idx = 4
+            elif frequency == 'dv':
+                data_col_idx = 3
+            timestep_idx = 2
+
+            if len(df.dropna()) == 0:
+                print('No data available for the time period specified')
+                return None
+            elif df[df.columns[data_col_idx]].values[0] == '***':
+                print('Data temporarily unavailable for the time period specified')
+                return None
+            elif set(df['site_no'].isnull()) == {True}:
+                return None
+
+            # format the final dataframe to represent the observed rainfall following a datetime index
+            final_df = pd.DataFrame(df[df.columns[data_col_idx]].astype('float'))
+            final_df.columns = [site]
+            final_df.index = pd.to_datetime(df[df.columns[timestep_idx]].values)
+
+            return final_df
+    
+        # when an incorrect gage number is sent to the api, we end up at usgs url (second failure mechanism)
+        except:
+            return None
+        
+    elif parameter == 'Stage':
+        
+        param_id = '00065'
+        try:
+            # build url and make call only for USGS funded sites
+            url = f"https://waterservices.usgs.gov/nwis/{frequency}/?format={output_format}&sites={site}&startDT={start_date}&endDT={end_date}&parameterCd={param_id}&siteType=ST&agencyCd=usgs&siteStatus=all"
+            r = requests.get(url)
+
+            # check that api call worked
+            if r.status_code!=200:
+                print(f"Server response {r.status_code}: Returning None")
+                return None
+
+            # decode results
+            if output_format=='rdb':
+                df = pd.read_table(io.StringIO(r.content.decode('utf-8')), 
+                                comment='#',
+                                skip_blank_lines=True)
+                df = df.iloc[1:].copy()
+                
+
+            if frequency == 'iv':
+                # Columns: ['agency_cd', 'site_no', 'datetime', 'value', 'qualifiers', 'remark']
+                data_col_idx = 4
+            elif frequency == 'dv':
+                # Columns: ['agency_cd', 'site_no', 'datetime', 'value', 'qualifiers']
+                data_col_idx = 3
+            timestep_idx = 2
+
+            if len(df.dropna()) == 0:
+                print('No data available for the time period specified')
+                return None
+            elif df[df.columns[data_col_idx]].values[0] == 'ZFL':
+                print('Zero flow condition: Return None')
+                return None
+            elif df[df.columns[data_col_idx]].values[0] == '***':
+                print('Data temporarily unavailable for the time period specified')
+                return None
+            elif set(df['site_no'].isnull()) == {True}:
+                return None
+            
+            # format the final dataframe to represent the observed rainfall following a datetime index
+            final_df = pd.DataFrame(df[df.columns[data_col_idx]].astype('float'))
+            final_df.columns = [site]
+            final_df.index = pd.to_datetime(df[df.columns[timestep_idx]].values)
+
+            return final_df
+    
+        # when an incorrect gage number is sent to the api, we end up at usgs url (second failure mechanism)
+        except:
+            return None
+
+    else:
+        print('Only gaged Streamflow and Precipitation are available parameters for analysis at this point in time')
+        return
