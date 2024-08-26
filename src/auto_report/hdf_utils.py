@@ -279,6 +279,7 @@ def get_plan_params_attrs(hdf_file_path: str):
 
     return plan_params, plan_attrs
 
+
 def get_plan_cell_points(hdf_file_path: str):
     """
     Get the cell point solution data from the plan HDF file
@@ -287,7 +288,7 @@ def get_plan_cell_points(hdf_file_path: str):
     ----------
     hdf_file_path : str
         The file path to the HDF file
-    
+
     Returns
     -------
     cell_points : gpd.GeoDataFrame
@@ -319,6 +320,7 @@ def get_plan_cell_points(hdf_file_path: str):
         )
 
     return cell_points
+
 
 def get_bulk_hdf_plan(hdf_file_path: str, input_domain_id: str):
     """
@@ -505,6 +507,7 @@ def get_bulk_hdf_geom(hdf_file_path: str, input_domain_id: str):
         breaklines,
         proj_table,
     )
+
 
 def hdf_projection_table(plan_hdf: h5py.File):
     """
