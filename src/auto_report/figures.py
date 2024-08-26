@@ -33,19 +33,19 @@ import warnings
 from hy_river import (
     get_dem_data,
     get_nhd_flowlines,
-    get_nwis_streamflow,
+    get_nwis,
     filter_nid,
 )
 from hdf_utils import get_model_perimeter, get_plan_cell_points
 from metrics import calc_metrics
-from tables import fill_calibration_metrics_table
+from tables import fill_calibration_metrics_table, fill_computation_settings_table
 
 warnings.filterwarnings("ignore")
 
 # assign a global font size for the plots
 plt.rcParams.update({"font.size": 16})
 # Set the display option for floating-point numbers to show only 3 decimal places
-pd.options.display.float_format = '{:.3f}'.format
+pd.options.display.float_format = "{:.3f}".format
 # Functions ###################################################################
 
 
@@ -1221,7 +1221,9 @@ def plot_wse_errors(
         if report_document is None and report_keywords is None and plan_index is None:
             return output_message
         else:
-            report_keywords[f"plan0{plan_index}_figure_wse_errors"] = "No cells found in the HDF file"
+            report_keywords[
+                f"plan0{plan_index}_figure_wse_errors"
+            ] = "No cells found in the HDF file"
             return report_document, report_keywords
     elif len(cell_points[cell_points["max_ws_err"] > 0]) == 0:
         print("No cells with WSE errors greater than zero")
@@ -1318,7 +1320,9 @@ def plot_wse_ttp(
         if report_document is None and report_keywords is None and plan_index is None:
             return output_message
         else:
-            report_keywords[f"plan0{plan_index}_figure_wse_ttp"] = "No cells found in the HDF file"
+            report_keywords[
+                f"plan0{plan_index}_figure_wse_ttp"
+            ] = "No cells found in the HDF file"
             return report_document, report_keywords
 
     # Determine the global min time to peak for the simulation start time
@@ -1391,10 +1395,15 @@ def find_timstep_freq(df: pd.DataFrame):
     if isinstance(df.index, pd.MultiIndex):
         ts_index = df.index.droplevel(1)
         ts_freq = ts_index[1] - ts_index[0]
+        # cast the frequency to a Timedelta object
+        ts_freq = pd.Timedelta(ts_freq)
         return ts_freq
     else:
         ts_freq = df.index[1] - df.index[0]
+        # cast the frequency to a Timedelta object
+        ts_freq = pd.Timedelta(ts_freq)
         return ts_freq
+
 
 def format_datetime(qobs_df: pd.DataFrame, qsim_df: pd.DataFrame):
     """
@@ -1407,13 +1416,15 @@ def format_datetime(qobs_df: pd.DataFrame, qsim_df: pd.DataFrame):
         The observed data DataFrame
     qsim_df : pd.DataFrame
         The modeled data DataFrame
-    
+
     Returns
     -------
     qobs_df : pd.DataFrame
         The formatted observed data DataFrame
     qsim_df : pd.DataFrame
         The formatted modeled data DataFrame
+    timestep : str
+        The timestep frequency of the gage data
     """
     # Determine the frequency of the data
     qobs_freq = find_timstep_freq(qobs_df)
@@ -1421,61 +1432,78 @@ def format_datetime(qobs_df: pd.DataFrame, qsim_df: pd.DataFrame):
 
     # Resample the data to the same timestep frequency of the model
     if qobs_freq < qsim_freq:
-        print(
-            f"Resampling the observed data from {qobs_freq} to {qsim_freq}"
-        )
+        print(f"Resampling the observed data from {qobs_freq} to {qsim_freq}")
         qobs_df = qobs_df.resample(qsim_freq).mean()
-        if qsim_freq.seconds == 60:
-            print("Data is at a minute timestep")
-            qobs_df.index = pd.to_datetime(qobs_df.index, format="%Y-%m-%d %H:%M")
-            qsim_df.index = pd.to_datetime(qsim_df.index, format="%Y-%m-%d %H:%M")
-        elif qsim_freq.seconds == 3600:
-            print("Data is at an hourly timestep")
-            qobs_df.index = pd.to_datetime(qobs_df.index, format="%Y-%m-%d %H")
-            qsim_df.index = pd.to_datetime(qsim_df.index, format="%Y-%m-%d %H")
-        elif qsim_freq.days == 1:
-            print("Data is at a daily timestep")
+        if qsim_freq.days == 1:
+            timestep = f"{qsim_freq.days}-d"
             qobs_df.index = pd.to_datetime(qobs_df.index.date, format="%Y-%m-%d")
             qsim_df.index = pd.to_datetime(qsim_df.index.date, format="%Y-%m-%d")
+            print(f"Data is at a {timestep} timestep")
+            return qobs_df, qsim_df, timestep
+        if qsim_freq.seconds/60 < 60:
+            timestep = f"{qsim_freq.seconds // 60}-min"
+            qobs_df.index = pd.to_datetime(qobs_df.index, format="%Y-%m-%d %H:%M")
+            qsim_df.index = pd.to_datetime(qsim_df.index, format="%Y-%m-%d %H:%M")
+            print(f"Data is at a {timestep} timestep")
+            return qobs_df, qsim_df, timestep
+        if qsim_freq.seconds/60 >= 60:
+            timestep = f"{qsim_freq.seconds // 3600}-hr"
+            qobs_df.index = pd.to_datetime(qobs_df.index, format="%Y-%m-%d %H")
+            qsim_df.index = pd.to_datetime(qsim_df.index, format="%Y-%m-%d %H")
+            print(f"Data is at a {timestep} timestep")
+            return qobs_df, qsim_df, timestep
+
     elif qobs_freq > qsim_freq:
-        print(
-            f"Resampling the modeled data from {qsim_freq} to {qobs_freq}"
-        )
+        print(f"Resampling the modeled data from {qsim_freq} to {qobs_freq}")
         qsim_df = qsim_df.resample(qobs_freq).mean()
-        if qobs_freq.seconds == 60:
-            print("Data is at a minute timestep")
-            qobs_df.index = pd.to_datetime(qobs_df.index, format="%Y-%m-%d %H:%M")
-            qsim_df.index = pd.to_datetime(qsim_df.index, format="%Y-%m-%d %H:%M")
-        elif qobs_freq.seconds == 3600:
-            print("Data is at an hourly timestep")
-            qobs_df.index = pd.to_datetime(qobs_df.index, format="%Y-%m-%d %H")
-            qsim_df.index = pd.to_datetime(qsim_df.index, format="%Y-%m-%d %H")
-        elif qobs_freq.days == 1:
-            print("Data is at a daily timestep")
+        if qobs_freq.days == 1:
+            timestep = f"{qobs_freq.days}-d"
             qobs_df.index = pd.to_datetime(qobs_df.index.date, format="%Y-%m-%d")
             qsim_df.index = pd.to_datetime(qsim_df.index.date, format="%Y-%m-%d")
+            print(f"Data is at a {timestep} timestep")
+            return qobs_df, qsim_df, timestep
+        if qobs_freq.seconds/60 < 60 and qobs_freq.days != 1:
+            timestep = f"{qobs_freq.seconds // 60}-min"
+            qobs_df.index = pd.to_datetime(qobs_df.index, format="%Y-%m-%d %H:%M")
+            qsim_df.index = pd.to_datetime(qsim_df.index, format="%Y-%m-%d %H:%M")
+            print(f"Data is at a {timestep} timestep")
+            return qobs_df, qsim_df, timestep
+        if qobs_freq.seconds/60 >= 60 and qobs_freq.days != 1:
+            timestep = f"{qobs_freq.seconds // 3600}-hr"
+            qobs_df.index = pd.to_datetime(qobs_df.index, format="%Y-%m-%d %H")
+            qsim_df.index = pd.to_datetime(qsim_df.index, format="%Y-%m-%d %H")
+            print(f"Data is at a {timestep} timestep")
+            return qobs_df, qsim_df, timestep
+
     else:
         print(
             f"Observed and modeled data are at the same timestep frequency of {qobs_freq}"
         )
-        if qobs_freq.seconds == 60:
-            print("Data is at a minute timestep")
-            qobs_df.index = pd.to_datetime(qobs_df.index, format="%Y-%m-%d %H:%M")
-            qsim_df.index = pd.to_datetime(qsim_df.index, format="%Y-%m-%d %H:%M")
-        elif qobs_freq.seconds == 3600:
-            print("Data is at an hourly timestep")
-            qobs_df.index = pd.to_datetime(qobs_df.index, format="%Y-%m-%d %H")
-            qsim_df.index = pd.to_datetime(qsim_df.index, format="%Y-%m-%d %H")
-        elif qobs_freq.days == 1:
-            print("Data is at a daily timestep")
+        if qobs_freq.days == 1:
+            timestep = f"{qobs_freq.days}-d"
             qobs_df.index = pd.to_datetime(qobs_df.index.date, format="%Y-%m-%d")
             qsim_df.index = pd.to_datetime(qsim_df.index.date, format="%Y-%m-%d")
+            print(f"Data is at a {timestep} timestep")
+            return qobs_df, qsim_df, timestep
+        if qobs_freq.seconds/60 < 60:
+            timestep = f"{qobs_freq.seconds // 60}-min"
+            qobs_df.index = pd.to_datetime(qobs_df.index, format="%Y-%m-%d %H:%M")
+            qsim_df.index = pd.to_datetime(qsim_df.index, format="%Y-%m-%d %H:%M")
+            print(f"Data is at a {timestep} timestep")
+            return qobs_df, qsim_df, timestep
+        if qobs_freq.seconds/60 >= 60:
+            timestep = f"{qobs_freq.seconds // 3600}-hr"
+            qobs_df.index = pd.to_datetime(qobs_df.index, format="%Y-%m-%d %H")
+            qsim_df.index = pd.to_datetime(qsim_df.index, format="%Y-%m-%d %H")
+            print(f"Data is at a {timestep} timestep")
+            return qobs_df, qsim_df, timestep
     
-    return qobs_df, qsim_df
+
 
 def plot_hydrographs(
     hdf_plan_file_path: str,
     df_gages_usgs: gpd.GeoDataFrame,
+    parameter: str,
     domain_name: str,
     root_dir: str,
     plan_index: Optional[int] = None,
@@ -1491,6 +1519,8 @@ def plot_hydrographs(
         The path to the HDF plan file
     df_gages_usgs : gpd.GeoDataFrame
         The USGS gages located within the model perimeter
+    parameter : str
+        The parameter to plot. One of 'Flow' or 'Stage'
     domain_name : str
         The name of the domain
     root_dir : str
@@ -1518,31 +1548,29 @@ def plot_hydrographs(
     try:
         plan_hdf = RasPlanHdf.open_uri(hdf_plan_file_path)
     except Exception as e:
-        raise FileNotFoundError(f"The provided HDF plan file {hdf_plan_file_path} does not exist. Please verify the file path.") from e
+        raise FileNotFoundError(
+            f"The provided HDF plan file {hdf_plan_file_path} does not exist. Please verify the file path."
+        ) from e
     ref_lines = plan_hdf.reference_lines()
     ref_lines = ref_lines.to_crs(epsg=4326)  # convert to EPSG:4326
     ref_lines_ds = plan_hdf.reference_lines_timeseries_output()
     # Get the simulation start and end times
+    plan_params = plan_hdf.get_plan_param_attrs()
     plan_attrs = plan_hdf.get_plan_info_attrs()
     start_time = plan_attrs["Simulation Start Time"]
     end_time = plan_attrs["Simulation End Time"]
-    dates = (start_time, end_time)
     path_start_date = start_time.strftime("%Y-%m-%d")
     path_end_date = end_time.strftime("%Y-%m-%d")
-    print(f"Calibration period: {start_time} to {end_time}")
+    print(f"Calibration period: {path_start_date} to {path_end_date}")
 
-    # Query the NWIS server for streamflow at the gage locations
-    qobs_ds = get_nwis_streamflow(df_gages_usgs, dates)
-    if isinstance(qobs_ds, str):
-        if report_document is None and report_keywords is None and plan_index is None:
-            print(f"Error generating figure: {qobs_ds}")
-            output_message = f"Error generating figure: {qobs_ds}"
-            return output_message
-        else:
-            print(f"Error generating figure: {qobs_ds}")
-            keyword_key = f"plan0{plan_index}_figure_gage_flow"
-            report_keywords[keyword_key] = f"Error generating figure: {qobs_ds}"
-            return report_document, report_keywords
+    if parameter == "Flow":
+        y_label_txt = "Streamflow (cfs)"
+        sim_parameter = "Flow"
+        obs_parameter = "Flow"
+    elif parameter == "Stage":
+        y_label_txt = "Water Surface Elevation (ft)"
+        sim_parameter = "Water Surface"
+        obs_parameter = "Stage"
 
     # Units of degrees for EPSG:4326 to buffer outwards from the reference line location
     buffer_increment = 0.001  # Ex: 0.001 degrees is approximately 100 meters
@@ -1550,6 +1578,7 @@ def plot_hydrographs(
     print("Plotting hydrographs for each reference line")
     images_dict = {}
     metrics_list = []
+    df_gages_usgs = df_gages_usgs.reset_index(drop=True)
     for idx, line_id in enumerate(ref_lines.refln_id.values):
         # Intersect the gages with the reference lines
         gage_df = df_gages_usgs[
@@ -1561,74 +1590,91 @@ def plot_hydrographs(
             usgs_site_name = gage_df.station_nm.values[0]
             usgs_site_id = gage_df.site_no.values[0]
             station_id = f"USGS-{usgs_site_id}"
+            usgs_datum = gage_df.alt_va.values[0]
+            gage_idx = gage_df.index[0] + 1
             print(f"Plotting {station_id} for reference line {line_id}")
 
-            if station_id not in qobs_ds.station_id.values:
+            # Modeled streamflow
+            qsim_df = (
+                ref_lines_ds.sel(refln_id=line_id)
+                [sim_parameter].to_dataframe()[sim_parameter]
+                .to_frame()
+            )
+            qsim_df.columns = ["Modeled"]
+
+            # Observed streamflow: instantaneous values
+            qobs_df = get_nwis(usgs_site_id, obs_parameter, 'iv', path_start_date, path_end_date)
+            if qobs_df is None:
                 print(
-                    f"USGS station {station_id} is not available for the calibration period"
+                    f"Instantaneous data for USGS station {usgs_site_id} is not available for the calibration period"
                 )
-                continue
-            else:
-                # Modeled streamflow
-                qsim_df = (
-                    ref_lines_ds.sel(refln_id=line_id)
-                    .Flow.to_dataframe()["Flow"]
-                    .to_frame()
-                )
-                qsim_df.columns = ["Modeled"]
-
-                # Observed streamflow
-                qobs_df = (
-                    qobs_ds.sel(station_id=station_id)
-                    .discharge.to_dataframe()["discharge"]
-                    .to_frame()
-                )
-                qobs_df.columns = ["Observed"]
-                qobs_df["Observed"] = (
-                    qobs_df["Observed"] * 35.3147
-                )  # Convert from cms to cfs
-
-                # Resample the data to the same timestep frequency of the model
-                qobs_df, qsim_df = format_datetime(qobs_df, qsim_df)
-
-                # Calculate the metrics between the observed and modeled streamflow
-                q_df = pd.merge(qobs_df, qsim_df, left_index=True, right_index=True).dropna()
-                qobs_df, qsim_df = None, None
-                metrics = calc_metrics(q_df, usgs_site_id)
-                # Generate the figure
-                fig, ax = plt.subplots(figsize=(10, 10))
-                # Plot the modeled vs observed streamflow
-                q_df["Observed"].plot(ax=ax, color="blue", label="Observed", alpha=0.7)
-                q_df["Modeled"].plot(ax=ax, color="red", label="Modeled", alpha=0.7)
-                # Add grid lines
-                ax.grid()
-                # Add a legend
-                ax.legend()
-                # Add axis labels
-                ax.set_xlabel("Date")
-                ax.set_ylabel("Streamflow (cfs)")
-                # Add a title
-                ax.set_title(f"USGS-{usgs_site_id} {usgs_site_name}")
-                # Set the custom y-axis formatter
-                ax.get_yaxis().set_major_formatter(
-                    ticker.FuncFormatter(lambda x, p: format(int(x), ","))
-                )
-                # Save the figure
-                path = f"{domain_name}_{usgs_site_id}_plan0{plan_index}_.png"
-                print(f"Saving figure: {path}")
-                image_path = os.path.join(root_dir, path)
-                fig.savefig(image_path, bbox_inches="tight")
-                plt.close(fig)
-                if report_document is None and report_keywords is None and plan_index is None:
-                    images_dict[station_id] = image_path
-                    metrics_list.append(metrics)
-                else:
-                    # Search for the keyword within the document and add the image above it
-                    report_document = add_image_to_keyword(
-                        report_document, f"«plan0{plan_index}_figure_gage_flow»", image_path
+                # Observed streamflow: daily values
+                qobs_df = get_nwis(usgs_site_id, obs_parameter, 'dv', path_start_date, path_end_date)
+                if qobs_df is None:
+                    print(
+                        f"Daily data for USGS station {usgs_site_id} is not available for the calibration period"
                     )
-                    os.remove(image_path)
-                    metrics_list.append(metrics)
+                    continue
+
+            if parameter == "Stage":
+                qobs_df = qobs_df + usgs_datum
+
+            qobs_df.columns = ["Observed"]
+
+            # Resample the data to the same timestep frequency of the model
+            qobs_df, qsim_df, timestep = format_datetime(qobs_df, qsim_df)
+
+            # Calculate the metrics between the observed and modeled streamflow
+            q_df = pd.merge(
+                qobs_df, qsim_df, left_index=True, right_index=True
+            ).dropna()
+            qobs_df, qsim_df = None, None
+            metrics = calc_metrics(q_df, usgs_site_id)
+
+            # Generate the figure
+            fig, ax = plt.subplots(figsize=(10, 10))
+            # Plot the modeled vs observed streamflow
+            q_df["Observed"].plot(ax=ax, color="blue", label="Observed", alpha=0.7)
+            q_df["Modeled"].plot(ax=ax, color="red", label="Modeled", alpha=0.7)
+            # Add grid lines
+            ax.grid()
+            # Add a legend
+            ax.legend()
+            # Add axis labels
+            ax.set_xlabel("Date")
+            ax.set_ylabel(y_label_txt)
+            # Add a title
+            ax.set_title(f"USGS-{usgs_site_id} {usgs_site_name}")
+            # Set the custom y-axis formatter
+            ax.get_yaxis().set_major_formatter(
+                ticker.FuncFormatter(lambda x, p: format(int(x), ","))
+            )
+            # Save the figure
+            path = f"{domain_name}_{usgs_site_id}_plan0{plan_index}_{parameter}.png"
+            image_path = os.path.join(root_dir, path)
+            fig.savefig(image_path, bbox_inches="tight")
+            plt.close(fig)
+            if (
+                report_document is None
+                and report_keywords is None
+            ):
+                images_dict[station_id] = image_path
+                metrics_list.append(metrics)
+            else:
+                # Search for the keyword within the document and add the image above it
+                report_document = add_image_to_keyword(
+                    report_document,
+                    f"«plan0{plan_index}_figure_gage_{parameter}»",
+                    image_path,
+                )
+                os.remove(image_path)
+                metrics_list.append(metrics)
+                # Update the report text for Table 9: Two-Dimensional Computational Solver Tolerances and Settings
+                report_keywords = fill_computation_settings_table(report_keywords, plan_params, plan_attrs, plan_index)
+                # Update the report text for Table 11: Gage Calibration Timesteps
+                report_keywords[f'table11_gage0{gage_idx}_name'] = usgs_site_name
+                report_keywords[f'plan0{plan_index}_gage0{gage_idx}_{parameter.lower()}_ts'] = timestep
+                
         # Non-trivial scenario: no rows returned indicating no gages are within the buffer distance
         # Need to buffer out the reference line until the closest gage (within reason) is found
         elif len(gage_df) == 0:
@@ -1654,88 +1700,114 @@ def plot_hydrographs(
                 usgs_site_name = gage_df.station_nm.values[0]
                 usgs_site_id = gage_df.site_no.values[0]
                 station_id = f"USGS-{usgs_site_id}"
+                usgs_datum = gage_df.alt_va.values[0]
+                gage_idx = gage_df.index[0] + 1
+                print(f"Gage index: {gage_idx}")
                 print(f"Plotting {station_id} for reference line {line_id}")
 
-                if station_id not in qobs_ds.station_id.values:
+                # Modeled streamflow
+                qsim_df = (
+                    ref_lines_ds.sel(refln_id=line_id)
+                    [sim_parameter].to_dataframe()[sim_parameter]
+                    .to_frame()
+                )
+                qsim_df.columns = ["Modeled"]
+
+                # Observed streamflow
+                qobs_df = get_nwis(usgs_site_id, obs_parameter, path_start_date, path_end_date)
+                if qobs_df is None:
                     print(
-                        f"USGS station {station_id} is not available for the calibration period"
+                        f"USGS station {usgs_site_id} is not available for the calibration period"
                     )
                     continue
+
+                if parameter == "Stage":
+                    qobs_df = qobs_df + usgs_datum
+
+                qobs_df.columns = ["Observed"]
+
+                # Resample the data to the same timestep frequency of the model
+                qobs_df, qsim_df, timestep = format_datetime(qobs_df, qsim_df)
+
+                # Calculate the metrics between the observed and modeled streamflow
+                q_df = pd.merge(
+                    qobs_df, qsim_df, left_index=True, right_index=True
+                ).dropna()
+                qobs_df, qsim_df = None, None
+                metrics = calc_metrics(q_df, usgs_site_id)
+
+                # Generate the figure
+                fig, ax = plt.subplots(figsize=(10, 10))
+                # Plot the modeled vs observed streamflow
+                q_df["Observed"].plot(
+                    ax=ax, color="blue", label="Observed", alpha=0.7
+                )
+                q_df["Modeled"].plot(ax=ax, color="red", label="Modeled", alpha=0.7)
+                # Add grid lines
+                ax.grid()
+                # Add a legend
+                ax.legend()
+                # Add axis labels
+                ax.set_xlabel("Date")
+                ax.set_ylabel(y_label_txt)
+                # Add a title
+                ax.set_title(f"USGS-{usgs_site_id} {usgs_site_name}")
+                # Set the custom y-axis formatter
+                ax.get_yaxis().set_major_formatter(
+                    ticker.FuncFormatter(lambda x, p: format(int(x), ","))
+                )
+                # Save the figure
+                path = f"{domain_name}_{usgs_site_id}_plan0{plan_index}_{parameter}.png"
+                image_path = os.path.join(root_dir,path)
+                fig.savefig(image_path, bbox_inches="tight")
+                plt.close(fig)
+                if (
+                    report_document is None
+                    and report_keywords is None
+                ):
+                    images_dict[station_id] = image_path
+                    metrics_list.append(metrics)
                 else:
-                    # Modeled streamflow
-                    qsim_df = (
-                        ref_lines_ds.sel(refln_id=line_id)
-                        .Flow.to_dataframe()["Flow"]
-                        .to_frame()
+                    # Search for the keyword within the document and add the image above it
+                    report_document = add_image_to_keyword(
+                        report_document,
+                        f"«plan0{plan_index}_figure_gage_{parameter}»",
+                        image_path,
                     )
-                    qsim_df.columns = ["Modeled"]
-
-                    # Observed streamflow
-                    qobs_df = (
-                        qobs_ds.sel(station_id=station_id)
-                        .discharge.to_dataframe()["discharge"]
-                        .to_frame()
-                    )
-                    qobs_df.columns = ["Observed"]
-                    qobs_df["Observed"] = (
-                        qobs_df["Observed"] * 35.3147
-                    )  # Convert from cms to cfs
-
-                    # Resample the data to the same timestep frequency of the model
-                    qobs_df, qsim_df = format_datetime(qobs_df, qsim_df)
-
-                    # Calculate the metrics between the observed and modeled streamflow
-                    q_df = pd.merge(qobs_df, qsim_df, left_index=True, right_index=True).dropna()
-                    qobs_df, qsim_df = None, None
-                    metrics = calc_metrics(q_df, usgs_site_id)
-                    # Generate the figure
-                    fig, ax = plt.subplots(figsize=(10, 10))
-                    # Plot the modeled vs observed streamflow
-                    q_df["Observed"].plot(ax=ax, color="blue", label="Observed", alpha=0.7)
-                    q_df["Modeled"].plot(ax=ax, color="red", label="Modeled", alpha=0.7)
-                    # Add grid lines
-                    ax.grid()
-                    # Add a legend
-                    ax.legend()
-                    # Add axis labels
-                    ax.set_xlabel("Date")
-                    ax.set_ylabel("Streamflow (cfs)")
-                    # Add a title
-                    ax.set_title(f"USGS-{usgs_site_id} {usgs_site_name}")
-                    # Set the custom y-axis formatter
-                    ax.get_yaxis().set_major_formatter(
-                        ticker.FuncFormatter(lambda x, p: format(int(x), ","))
-                    )
-                    # Save the figure
-                    image_path = os.path.join(
-                        root_dir, f"{domain_name}_{usgs_site_id}_{path_start_date}_{path_end_date}.png"
-                    )
-                    fig.savefig(image_path, bbox_inches="tight")
-                    plt.close(fig)
-                    if report_document is None and report_keywords is None and plan_index is None:
-                        images_dict[station_id] = image_path
-                        metrics_list.append(metrics)
-                    else:
-                        # Search for the keyword within the document and add the image above it
-                        report_document = add_image_to_keyword(
-                            report_document, f"«plan0{plan_index}_figure_gage_flow»", image_path
-                        )
-                        os.remove(image_path)
-                        metrics_list.append(metrics)
+                    os.remove(image_path)
+                    metrics_list.append(metrics)
+                    # Update the report text for Table 9: Two-Dimensional Computational Solver Tolerances and Settings
+                    report_keywords = fill_computation_settings_table(report_keywords, plan_params, plan_attrs, plan_index)
+                    # Update the report text for Table 11: Gage Calibration Timesteps
+                    report_keywords[f'table11_gage0{gage_idx}_name'] = usgs_site_name
+                    report_keywords[f'plan0{plan_index}_gage0{gage_idx}_{parameter.lower()}_ts'] = timestep
             elif len(gage_df) > 1:
                 raise ValueError(
                     f"{len(gage_df)} gages found within the minimum buffer distance of the reference line. {gage_df}."
                 )
-    if report_document is None and report_keywords is None and plan_index is None:
+    if report_document is None and report_keywords is None:
         # Combine the metrics into a single dataframe
-        metrics_df = pd.concat(metrics_list)
-        return images_dict, metrics_df
+        if len(metrics_list) == 0:
+            return images_dict, None
+        else:
+            metrics_df = pd.concat(metrics_list)
+            return images_dict, metrics_df
     else:
         # Update the report text
-        report_keywords[f"plan0{plan_index}_figure_gage_flow"] = "USGS Gage Flow Calibration Plots"
-        report_keywords[f"plan0{plan_index}_date"] = f"{path_start_date} to {path_end_date}"
-        # Combine all gage metrics into a single dataframe
-        metrics_df = pd.concat(metrics_list)
-        # Update the calibration metrics table in the report
-        report_keywords = fill_calibration_metrics_table(report_keywords, plan_index, metrics_df)
-        return report_document, report_keywords 
+        report_keywords[
+            f"plan0{plan_index}_figure_gage_{parameter}"
+        ] = "USGS Gage Flow Calibration Plots"
+        report_keywords[
+            f"plan0{plan_index}_date"
+        ] = f"{path_start_date} to {path_end_date}"
+        report_keywords
+        if len(metrics_list) == 0:
+            return report_document, report_keywords
+        else:
+            # Combine all gage metrics into a single dataframe
+            metrics_df = pd.concat(metrics_list)
+            # Update the calibration metrics table in the report
+            report_keywords = fill_calibration_metrics_table(
+                report_keywords, plan_index, metrics_df, parameter
+            )
+            return report_document, report_keywords
