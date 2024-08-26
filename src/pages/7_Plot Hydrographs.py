@@ -49,10 +49,15 @@ if __name__ == "__main__":
         "Geometry HDF File",
         "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/Denton/Trinity_1203_Denton/Trinity_1203_Denton.g01.hdf",
     )
-    PLAN_HDF = st.multiselect(label="Plan HDF File(s)", 
-                              options=[f".p0{num}.hdf" if num < 10 else f".p{num}.hdf" for num in np.arange(1, 33, 1)], 
-                              default=None,
-                              max_selections=6)
+    PLAN_HDF = st.multiselect(
+        label="Plan HDF File(s)",
+        options=[
+            f".p0{num}.hdf" if num < 10 else f".p{num}.hdf"
+            for num in np.arange(1, 33, 1)
+        ],
+        default=None,
+        max_selections=6,
+    )
     st.subheader("Optional Input")
     st.write(
         "The name of the 2D flow area within the HEC-RAS model. Only necessary if more than one 2D flow area is present."
@@ -109,7 +114,7 @@ if __name__ == "__main__":
                 )
                 plan_img_dict[plan] = imgs_dict
                 plan_metrics_dict[plan] = metrics_df
-                
+
                 if len(imgs_dict) == 0:
                     st.error("No gages were found within the model perimeter.")
                 else:
