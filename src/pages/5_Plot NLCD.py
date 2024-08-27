@@ -85,9 +85,13 @@ if __name__ == "__main__":
 
     if st.session_state["figure_generated"]:
         st.write("Download the figure:")
-        st.markdown(
-            f'<a href="{img_path}" download>Click here to download the figure</a>',
-            unsafe_allow_html=True,
-        )
+        # Read the image file in binary mode
+        with open(img_path, "rb") as file:
+            btn = st.download_button(
+                label="Click here to download the figure",
+                data=file,
+                file_name="nlcd.png",
+                mime="image/png"
+            )
         # view the figure
         st.image(img_path)

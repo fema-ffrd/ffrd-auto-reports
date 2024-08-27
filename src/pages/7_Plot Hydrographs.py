@@ -58,6 +58,12 @@ if __name__ == "__main__":
         default=None,
         max_selections=6,
     )
+    st.write("Select the hydrograph parameter to plot.")
+    HYDRO_PARAM = st.selectbox(
+        "Hydrograph Parameter",
+        ["Flow", "Stage"],
+        index=0,
+    )
     st.subheader("Optional Input")
     st.write(
         "The name of the 2D flow area within the HEC-RAS model. Only necessary if more than one 2D flow area is present."
@@ -106,6 +112,7 @@ if __name__ == "__main__":
                 imgs_dict, metrics_df = plot_hydrographs(
                     plan,
                     df_gages_usgs,
+                    HYDRO_PARAM,
                     domain_name,
                     session_data_dir,
                     plan_index,
@@ -124,9 +131,21 @@ if __name__ == "__main__":
             st.error("Please provide the required input.")
 
     if st.session_state["figure_generated"]:
+        gage_idx, plan_idx = 0, 0
         for plan in plan_hdf_paths:
+            plan_idx = plan_idx + 1
             # Display the metrics
             st.dataframe(plan_metrics_dict[plan])
             # Display the figures. Key is the unique gage name: USGS-08087000
             for key in plan_img_dict[plan].keys():
-                st.image(plan_img_dict[plan][key])
+                gage_idx = gage_idx + 1
+                img_path = plan_img_dict[plan][key]
+                # Read the image file in binary mode
+                with open(img_path, "rb") as file:
+                    btn = st.download_button(
+                        label="Click here to download the figure",
+                        data=file,
+                        file_name=f"plan0{plan_idx}_gage0{gage_idx}.png",
+                        mime="image/png"
+                    )
+                st.image(img_path)

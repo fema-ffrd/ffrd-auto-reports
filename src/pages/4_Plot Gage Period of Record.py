@@ -101,12 +101,18 @@ if __name__ == "__main__":
             st.error("Please provide the required input.")
 
     if st.session_state["figure_generated"]:
+        gage_idx = 0
         if img_path_list is not None:
             for img_path in img_path_list:
                 st.write("Download the figure:")
-                st.markdown(
-                    f'<a href="{img_path}" download>Click here to download the figure</a>',
-                    unsafe_allow_html=True,
-                )
+                gage_idx = gage_idx + 1
+                # Read the image file in binary mode
+                with open(img_path, "rb") as file:
+                    btn = st.download_button(
+                        label="Click here to download the figure",
+                        data=file,
+                        file_name=f"gage0{gage_idx}_por.png",
+                        mime="image/png"
+                    )
                 # view the figure
                 st.image(img_path)
