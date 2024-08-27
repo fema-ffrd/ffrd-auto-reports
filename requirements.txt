@@ -7,7 +7,6 @@ matplotlib==3.8.0
 openpyxl==3.0.10
 pandas==2.2.2 # PINNED
 pip==23.3
-planetary-computer==1.0.0
 pylint==2.16.2
 pytest==7.4.0
 python-docx==1.1.2
@@ -15,6 +14,7 @@ s3fs==2023.9.2 # PINNED
 aiobotocore==2.5.4 # PINNED
 contextily==1.6.0
 nest_asyncio==1.5.6
+permetrics==2.0.0
 pygeohydro==0.17.0
 py3dep==0.17.0
 python-dotenv==1.0.1
