@@ -192,6 +192,14 @@ async def auto_report(
         proj_table,
     ) = get_bulk_hdf_geom(hdf_geom_file_path, input_domain_id)
 
+    # Get the HDF plan data
+    if active_streamlit:
+        st.write("Step 2 / 12")
+        st.write("Processing for the HDF plan data...")
+    else:
+        print("Step 2 / 12")
+        print("Processing for the HDF plan data...")
+    
     plan_hdf_paths = [
         hdf_geom_file_path.split(".")[0] + plan for plan in hdf_plan_files
     ]
