@@ -1,0 +1,23 @@
+black==23.3.0
+folium==0.14.0
+fsspec==2023.9.2
+h5py==3.9.0
+mapclassify==2.5.0
+matplotlib==3.8.0
+openpyxl==3.0.10
+pandas==2.2.2 # PINNED
+pip==23.3
+pylint==2.16.2
+pytest==7.4.0
+python-docx==1.1.2
+s3fs==2023.9.2 # PINNED
+aiobotocore==2.5.4 # PINNED
+contextily==1.6.0
+nest_asyncio==1.5.6
+permetrics==2.0.0
+pygeohydro==0.17.0
+py3dep==0.17.0
+python-dotenv==1.0.1
+docx-mailmerge==0.5.0
+rashdf==0.6.0 # PINNED
+streamlit==1.37.1

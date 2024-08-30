@@ -1,0 +1,6 @@
+libgdal-dev
+libsqlite3-dev
+build-essential
+curl
+software-properties-common
+git
