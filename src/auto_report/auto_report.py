@@ -117,7 +117,7 @@ and in Jupyter notebooks.
 
 async def auto_report(
     hdf_geom_file_path: str,
-    hdf_plan_files: list,
+    plan_hdf_paths: list,
     nlcd_file_path: str,
     report_file_path: str,
     report_keywords: dict,
@@ -138,7 +138,7 @@ async def auto_report(
     ----------
     hdf_geom_file_path : str
         The path to the geometry HDF file
-    hdf_plan_files : list
+    plan_hdf_paths : list
         A list of extensions to the plan HDF files
     nlcd_file_path : str
         The path to the NLCD file
@@ -199,10 +199,6 @@ async def auto_report(
     else:
         print("Step 2 / 12")
         print("Processing for the HDF plan data...")
-    
-    plan_hdf_paths = [
-        hdf_geom_file_path.split(".")[0] + plan for plan in hdf_plan_files
-    ]
 
     # Collect all USGS gages located within the perimeter boundary
     if active_streamlit:

@@ -18,6 +18,7 @@ from app_utilities import (
     compress_directory,
     write_session_parameters,
     initialize_session,
+    list_s3_files,
     particles_js,
 )
 
@@ -88,17 +89,34 @@ if __name__ == "__main__":
     # Required inputs
     with col3:
         st.subheader("Required Input:")
-        st.write("File paths from the developed HEC-RAS model")
-        GEOM_HDF_PATH = st.text_input(
-            "Geometry HDF File",
-            "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/Denton/Trinity_1203_Denton/Trinity_1203_Denton.g01.hdf",
+        st.write("S3 bucket where the developed HEC-RAS model is stored.")
+        S3_BUCKET_PATH = st.text_input(
+            "S3 Bucket", "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/Denton/Trinity_1203_Denton/",
+
         )
+        if S3_BUCKET_PATH is not None:
+            try:
+                available_geom_files = list_s3_files(S3_BUCKET_PATH, "g")
+                available_plan_files = list_s3_files(S3_BUCKET_PATH, "p")
+                # check if there is a / at the end of the bucket
+                if S3_BUCKET_PATH[-1] != "/":
+                    S3_BUCKET_PATH = S3_BUCKET_PATH + "/"
+            except Exception as e:
+                st.error(f"Error: The provided S3 bucket does not exist. Please verify the correct S3 bucket path.")
+                st.stop()
+        else:
+            available_geom_files = []
+            available_plan_files = []
+
+        st.write("Select a single geometry file")
+        GEOM_HDF_FILE = st.selectbox(
+            label="Geometry HDF File",
+            options=available_geom_files
+        )
+        st.write("Select one or more plan files")
         PLAN_HDF_FILES = st.multiselect(
             label="Plan HDF File(s)",
-            options=[
-                f".p0{num}.hdf" if num < 10 else f".p{num}.hdf"
-                for num in np.arange(1, 33, 1)
-            ],
+            options=available_plan_files,
             default=None,
             max_selections=6,
         )
@@ -154,11 +172,13 @@ if __name__ == "__main__":
         st.subheader("Generate Report")
         st.write("Click the button below to run the report.")
         if st.button("Begin Report Generation"):
-            if GEOM_HDF_PATH is not None and PLAN_HDF_FILES is not None:
+            if GEOM_HDF_FILE is not None and PLAN_HDF_FILES is not None:
+                GEOM_HDF_PATH = S3_BUCKET_PATH + GEOM_HDF_FILE
+                PLAN_HDF_PATHS = [S3_BUCKET_PATH + file for file in PLAN_HDF_FILES]
                 try:
                     main_auto_report(
                         GEOM_HDF_PATH,
-                        PLAN_HDF_FILES,
+                        PLAN_HDF_PATHS,
                         NLCD_PATH,
                         report_file,
                         DOMAIN_ID,

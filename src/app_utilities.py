@@ -10,6 +10,8 @@ import os
 import shutil
 from datetime import datetime
 import zipfile
+import s3fs
+from urllib.parse import urlparse
 import streamlit as st
 from dotenv import load_dotenv
 
@@ -129,6 +131,43 @@ def write_session_parameters(session_state):
             # f.write("%s,%s\n"%(key,my_dict[key]))
             f.write(f"{key},{session_state[key]}\n")
 
+def list_s3_files(s3_uri: str, file_type: str):
+    """
+    List all files within an s3 folder given a file in the folder.
+
+    Args:
+        s3_uri (str): The S3 URI of a bucket (e.g., 's3://my-bucket/my-folder').
+        file_type (str): The file type to filter for. One of "g" or "p".
+
+    Returns:
+        plan_files: A list of plan file extensions in the S3 URI folder.
+    """
+
+    # Parse the S3 URI
+    parsed_url = urlparse(s3_uri)
+    bucket_name = parsed_url.netloc
+    prefix = parsed_url.path.lstrip('/')
+
+    # Create an S3 filesystem object
+    fs = s3fs.S3FileSystem()
+
+    # List objects within the specified prefix
+    file_keys = fs.ls(f'{bucket_name}/{prefix}', detail=False)
+
+    # filter to only include files with .hdf extensions
+    file_keys = [file for file in file_keys if file.endswith(".hdf")]
+
+    # filter to only include hdf files of the specifed type (g or p)
+    hdf_files = []
+    for file in file_keys:
+        if file.endswith(".hdf"):
+            file_extension = file.split("/")[-1].split(".")[-2]
+            model_name = file.split("/")[-1].split(".")[-3]
+            if file_extension.startswith(file_type):
+                available_file = f"{model_name}.{file_extension}.hdf"
+                hdf_files.append(available_file)
+
+    return hdf_files
 
 particles_js = """<!DOCTYPE html>
 <html lang="en">

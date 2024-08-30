@@ -11,7 +11,7 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
-from app_utilities import initialize_session
+from app_utilities import initialize_session, list_s3_files
 
 # Determine where the script is located in the Pages folder
 currDir = os.path.dirname(os.path.realpath(__file__))
@@ -44,17 +44,34 @@ if __name__ == "__main__":
     )
 
     st.subheader("Required Input")
-    st.write("File paths from the developed HEC-RAS model")
-    GEOM_HDF_PATH = st.text_input(
-        "Geometry HDF File",
-        "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/Denton/Trinity_1203_Denton/Trinity_1203_Denton.g01.hdf",
+    st.write("S3 bucket where the developed HEC-RAS model is stored.")
+    S3_BUCKET_PATH = st.text_input(
+        "S3 Bucket", "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/Denton/Trinity_1203_Denton/",
+
     )
-    PLAN_HDF = st.multiselect(
+    if S3_BUCKET_PATH is not None:
+        try:
+            available_geom_files = list_s3_files(S3_BUCKET_PATH, "g")
+            available_plan_files = list_s3_files(S3_BUCKET_PATH, "p")
+            # check if there is a / at the end of the bucket
+            if S3_BUCKET_PATH[-1] != "/":
+                S3_BUCKET_PATH = S3_BUCKET_PATH + "/"
+        except Exception as e:
+            st.error(f"Error: The provided S3 bucket does not exist. Please verify the correct S3 bucket path.")
+            st.stop()
+    else:
+        available_geom_files = []
+        available_plan_files = []
+
+    st.write("Select a single geometry file")
+    GEOM_HDF_FILE = st.selectbox(
+        label="Geometry HDF File",
+        options=available_geom_files
+    )
+    st.write("Select one or more plan files")
+    PLAN_HDF_FILES = st.multiselect(
         label="Plan HDF File(s)",
-        options=[
-            f".p0{num}.hdf" if num < 10 else f".p{num}.hdf"
-            for num in np.arange(1, 33, 1)
-        ],
+        options=available_plan_files,
         default=None,
         max_selections=6,
     )
@@ -89,9 +106,10 @@ if __name__ == "__main__":
     st.subheader("Generate Figure(s)")
     st.write("Click the button below to generate the figure(s).")
     if st.button("Begin Figure Generation"):
-        if GEOM_HDF_PATH is not None and PLAN_HDF is not None:
+        if GEOM_HDF_FILE is not None and PLAN_HDF_FILES is not None:
             # Construct the full path to each plan hdf file
-            plan_hdf_paths = [GEOM_HDF_PATH.split(".")[0] + plan for plan in PLAN_HDF]
+            GEOM_HDF_PATH = S3_BUCKET_PATH + GEOM_HDF_FILE
+            PLAN_HDF_PATHS = [S3_BUCKET_PATH + file for file in PLAN_HDF_FILES]
             # Get the model perimeter and domain name
             model_perimeter = get_model_perimeter(
                 GEOM_HDF_PATH, DOMAIN_ID, project_to_4326=True
@@ -106,7 +124,7 @@ if __name__ == "__main__":
                 pass
             plan_img_dict = {}
             plan_metrics_dict = {}
-            for plan_index, plan in enumerate(plan_hdf_paths):
+            for plan_index, plan in enumerate(PLAN_HDF_PATHS):
                 # Plot the calibrated gage hydrographs
                 plan_index = plan_index + 1
                 imgs_dict, metrics_df = plot_hydrographs(
@@ -132,7 +150,7 @@ if __name__ == "__main__":
 
     if st.session_state["figure_generated"]:
         gage_idx, plan_idx = 0, 0
-        for plan in plan_hdf_paths:
+        for plan in PLAN_HDF_PATHS:
             plan_idx = plan_idx + 1
             # Display the metrics
             st.dataframe(plan_metrics_dict[plan])
