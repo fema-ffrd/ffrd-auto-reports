@@ -183,16 +183,16 @@ def plot_pilot_study_area(
     streams_df = streams_df[streams_df["gnisidlabel"].isin(stream_name_freq.index)]
 
     ### Mainstem Reach
-    gcx = GeoConnex("mainstems")
-    mainstem_reach_name = stream_name_freq.idxmax()
+    # gcx = GeoConnex("mainstems")
+    # mainstem_reach_name = stream_name_freq.idxmax()
     # Determine the mainstem reach ID from the streams_df. The ID is the last part of the mainstemid url
     # Ex: https://geoconnex.us/ref/mainstems/322043
-    mainstem_reach_id = (
-        streams_df[streams_df["gnisidlabel"] == mainstem_reach_name]["mainstemid"]
-        .unique()[0]
-        .split("/")[-1]
-    )
-    mainstem_reach = gcx.byid("id", mainstem_reach_id)
+    # mainstem_reach_id = (
+    #     streams_df[streams_df["gnisidlabel"] == mainstem_reach_name]["mainstemid"]
+    #     .unique()[0]
+    #     .split("/")[-1]
+    # )
+    # mainstem_reach = gcx.byid("id", int(mainstem_reach_id))
 
     ### Generate the figure
     fig, ax = plt.subplots(figsize=(10, 10))
@@ -205,7 +205,9 @@ def plot_pilot_study_area(
     )
     huc4_boundary.plot(ax=ax, facecolor="none", edgecolor="black", linewidth=3)
     streams_df.plot(ax=ax, color="blue", linewidth=1, alpha=0.5)
-    mainstem_reach.plot(ax=ax, color="blue", linewidth=2, label=mainstem_reach_name)
+
+    # mainstem_reach.plot(ax=ax, color="blue", linewidth=2, label=mainstem_reach_name)
+
     # Add lat/lon labels
     ax.set_xlabel("Longitude")
     ax.set_ylabel("Latitude")
@@ -220,7 +222,7 @@ def plot_pilot_study_area(
         Line2D([0], [0], color="black", lw=3),  # HUC4 Boundary
         Line2D([0], [0], color="blue", lw=3),  # Mainstem Reach
     ]
-    labels = ["Model Domain", "HUC4 Boundary", mainstem_reach_name]
+    labels = ["Model Domain", "HUC4 Boundary"] #, mainstem_reach_name]
 
     # Create a divider for the existing axes instance
     divider = make_axes_locatable(ax)
