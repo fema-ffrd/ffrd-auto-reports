@@ -93,8 +93,98 @@ if __name__ == "__main__":
             "Collect all gages, old and current",
             "Only collect gages that provide current data",
         ],
-        index=1,
+        index=0,
     )
+    if HYDRO_PARAM == "Flow":
+        st.write("Select the baseflow separation method.")
+        BASEFLOW_METHOD = st.radio(
+            "Baseflow Seperation Method:",
+            [
+                "Eckhardt",
+                "Chapman",
+                "Chapman & Maxwell",
+                "Local",
+                "None",
+            ],
+            index=0,
+        )
+        if BASEFLOW_METHOD == "Eckhardt":
+            st.write("""
+                    The Eckhardt method (Eckhardt, 2005) is a recursive digital filter that 
+                    separates the baseflow from the total flow. This method is generally
+                    considered the most accurate across CONUS based on past research:
+                    https://doi.org/10.1016/j.jhydrol.2020.124628
+                    
+                    The two parameters required for the Eckhardt filter are alpha and beta. 
+                        
+                    The alpha parameter ( 0 < a < 1) is the recession coefficient, which controls the 
+                    responsiveness of the filter and indicates the type of groundwater system. Large 
+                    values for a indicate groundwater dominated - slow draining systems. Small values 
+                    for a indicate shallow subsurface flow dominated fast draining systems.
+                    The recession coefficient is estimated using the gaged period of record for daily
+                    streamflow data assuming exponential recession behavior. https://doi.org/10.1016/j.envsoft.2021.104983
+                        
+                    The beta parameter (0 < b < 1) is the baseflow index, which is the maximum percentage
+                    of the total flow that can be attributed to baseflow. The baseflow index for individual 
+                    reach catchments of the NHDFPlus version 2 data suite is estimated by the U.S. 
+                    Geological Survey's (USGS) National Water-Quality Assessment Project (NAWQA) which is 
+                    part of the USGS National Water Quality Program (NWQP). https://doi.org/10.5066/P9PA63SM
+                        """)
+        elif BASEFLOW_METHOD == "Chapman":
+            st.write("""
+                    The Chapman method (Chapman, 1991) is a recursive digital filter that separates the baseflow
+                    from the total flow. This method is considered less complex and accurate than the Eckhardt 
+                    method but it is still widely used. The Chapman method is based on the assumption that the 
+                    baseflow is a linear function of the streamflow. Meaning, it assumes that the baseflow can 
+                    be modeled as a linear reservoir, where the outflow (baseflow) is proportional to the storage 
+                    (groundwater). 
+                    
+                    The main parameter required for the Chapman filter is alpha.
+                     
+                    The alpha parameter ( 0 < a < 1) is the recession coefficient, which controls the 
+                    responsiveness of the filter and indicates the type of groundwater system. Large 
+                    values for a indicate groundwater dominated - slow draining systems. Small values 
+                    for a indicate shallow subsurface flow dominated fast draining systems.
+                    The recession coefficient is estimated using the gaged period of record for daily
+                    streamflow data assuming exponential recession behavior. https://doi.org/10.1016/j.envsoft.2021.104983
+                    """)
+        elif BASEFLOW_METHOD == "Chapman & Maxwell":
+            st.write("""
+                    The Chapman & Maxwell method (Chapman & Maxwell, 1996) is a recursive digital filter that 
+                    separates the baseflow from the total flow. While the Chapman & Maxwell method uses a similar 
+                    formula to the original Chapman method, it incorporates additional considerations to improve 
+                    accuracy, particularly in varying hydrological conditions. This makes it more robust for different 
+                    types of watersheds and streamflow patterns.
+                     
+                    The main parameter required for the Chapman filter is alpha.
+                     
+                    The alpha parameter ( 0 < a < 1) is the recession coefficient, which controls the 
+                    responsiveness of the filter and indicates the type of groundwater system. Large 
+                    values for a indicate groundwater dominated - slow draining systems. Small values 
+                    for a indicate shallow subsurface flow dominated fast draining systems.
+                    The recession coefficient is estimated using the gaged period of record for daily
+                    streamflow data assuming exponential recession behavior. https://doi.org/10.1016/j.envsoft.2021.104983
+                    """)
+        elif BASEFLOW_METHOD == "Local":
+            st.write("""
+                    The Local minimum graphical method from HYSEP program (Sloto & Crouse, 1996) is one of the 
+                    three hydrograph separation techniques included in the HYSEP (Hydrograph Separation) 
+                    program developed by Ronald A. Sloto and Michèle Y. Crouse in 1996. The method identifies 
+                    baseflow by finding the minimum streamflow values over specified intervals.
+                     
+                    The streamflow hydrograph is divided into ( N )-day intervals, where ( N ) is a user-specified 
+                    duration. This interval length is typically chosen based on the watershed’s response time to 
+                    precipitation events. Within each ( N )-day interval, the minimum streamflow value is identified. 
+                    These local minima are assumed to represent the baseflow component of the streamflow. The 
+                    identified local minima are then connected to form a continuous baseflow hydrograph. This 
+                    graphical method assumes that the lowest flow values within each interval are primarily 
+                    due to groundwater contributions, thus representing baseflow.
+                    """)
+        elif BASEFLOW_METHOD == "None":
+            st.write("""
+                    No baseflow separation method will be applied to the hydrograph.
+                    """)
+
     # Create and set an event loop
     try:
         loop = asyncio.get_event_loop()
@@ -129,8 +219,10 @@ if __name__ == "__main__":
                 plan_index = plan_index + 1
                 imgs_dict, metrics_df = plot_hydrographs(
                     plan,
+                    model_perimeter,
                     df_gages_usgs,
                     HYDRO_PARAM,
+                    BASEFLOW_METHOD,
                     domain_name,
                     session_data_dir,
                     plan_index,
@@ -153,7 +245,7 @@ if __name__ == "__main__":
         for plan in PLAN_HDF_PATHS:
             plan_idx = plan_idx + 1
             # Display the metrics
-            st.dataframe(plan_metrics_dict[plan])
+            st.dataframe(plan_metrics_dict[plan].T)
             # Display the figures. Key is the unique gage name: USGS-08087000
             for key in plan_img_dict[plan].keys():
                 gage_idx = gage_idx + 1
