@@ -142,7 +142,18 @@ if __name__ == "__main__":
                 "Collect all gages, old and current",
                 "Only collect gages that provide current data",
             ],
-            index=1,
+            index=0,
+        )
+        BASEFLOW_METHOD = st.radio(
+            "Baseflow Seperation Method:",
+            [
+                "Eckhardt",
+                "Chapman",
+                "Chapman & Maxwell",
+                "Local",
+                "None",
+            ],
+            index=0,
         )
         STREAM_THRESHOLD = st.number_input("Stream Threshold", 20)
         st.write("National Inventory of Dams (NID) vertical height criteria")
@@ -183,6 +194,7 @@ if __name__ == "__main__":
                         report_file,
                         DOMAIN_ID,
                         GAGE_COLLECTION_METHOD,
+                        BASEFLOW_METHOD,
                         STREAM_THRESHOLD,
                         WSE_ERROR_THRESHOLD,
                         NUM_BINS,
