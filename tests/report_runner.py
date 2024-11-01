@@ -17,7 +17,8 @@ if __name__ == "__main__":
 
     # Denton
     GEOM_HDF_PATH = "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/Denton/Trinity_1203_Denton/Trinity_1203_Denton.g01.hdf"
-    PLAN_HDF_FILES = [".p01.hdf", ".p02.hdf", ".p03.hdf", ".p04.hdf", ".p06.hdf", ".p11.hdf"]
+    #PLAN_HDF_FILES = [".p01.hdf", ".p02.hdf", ".p03.hdf", ".p04.hdf", ".p06.hdf", ".p11.hdf"]
+    PLAN_HDF_FILES = ["s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/Denton/Trinity_1203_Denton/Trinity_1203_Denton.p03.hdf"]
     NLCD_PATH = "s3://trinity-pilot/Checkpoint1-ModelsForReview/Hydraulics/Denton/Trinity_1203_Denton/Reference/LandCover/Denton_LandCover.tif"
 
     # EaFT Lavon
@@ -31,6 +32,7 @@ if __name__ == "__main__":
     NUM_BINS = 100  # Number of bins for the histogram
     NID_DAM_HEIGHT = 20  # Dam height threshold for the NID inventory
     GAGE_COLLECTION_METHOD = "Only collect gages that provide current data"  # or "Collect all gages, old and current"
+    BASEFLOW_METHOD = "Eckhardt"
     ####### End User Input #######
 
     REPORT_PATH = r"/workspaces/ffrd-auto-reports/src/assets/FFRD-RAS-Report-Automated-Template.docx"
@@ -46,6 +48,7 @@ if __name__ == "__main__":
         REPORT_PATH,
         DOMAIN_ID,
         GAGE_COLLECTION_METHOD,
+        BASEFLOW_METHOD,
         STREAM_THRESHOLD,
         WSE_ERROR_THRESHOLD,
         NUM_BINS,
