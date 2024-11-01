@@ -36,7 +36,7 @@ def pbias_score(obs_values: np.array, model_values: np.array):
     return pbias_val
 
 
-def calc_metrics(q_df: pd.DataFrame, station_id: str):
+def calc_metrics(q_df: pd.DataFrame, station_id: str, target: str):
     """
     Calculate streamflow statistics
 
@@ -46,16 +46,33 @@ def calc_metrics(q_df: pd.DataFrame, station_id: str):
         Dataframe containing observed and modeled streamflow data
     station_id: str
         String unique identified for USGS gage
+    target: str
+        Column target variable for calculating the statistics.
+        One of ['Hydrograph', 'Runoff', 'Baseflow']
 
     Returns
     -------
     stats_df : pandas dataframe
         Dataframe of streamflow calibration statistics. Columns are the plan column id and the rows are the statistics
     """
+    if target == "Baseflow":
+        # check if either the observed or modeled baseflow is all zeros
+        if np.all(q_df[f"Observed {target}"].values == 0) or np.all(q_df[f"Modeled {target}"].values == 0):
+            stats_df = pd.DataFrame(
+                {
+                    f"{target} R2": [np.nan],
+                    f"{target} NSE": [np.nan],
+                    f"{target} RSR": [np.nan],
+                    f"{target} PBIAS": [np.nan],
+                    f"{target} PFPE": [np.nan],
+                }
+            )
+            stats_df.index = [station_id]
+            return stats_df
     # create a regression metric object
     evaluator = RegressionMetric(
-        y_true=q_df["Observed"].values.reshape(-1, 1),
-        y_pred=q_df["Modeled"].values.reshape(-1, 1),
+        y_true=q_df[f"Observed {target}"].values.reshape(-1, 1),
+        y_pred=q_df[f"Modeled {target}"].values.reshape(-1, 1),
     )
     # calculate the r2
     r2_val = evaluator.R2()
@@ -64,18 +81,22 @@ def calc_metrics(q_df: pd.DataFrame, station_id: str):
     # calculate the rmse
     rmse_val = evaluator.root_mean_squared_error()
     # calculate the std dev
-    std_dev_obs = np.std(q_df["Observed"].values)
+    std_dev_obs = np.std(q_df[f"Observed {target}"].values)
     # calculate the rsr
     rsr_val = rmse_val / std_dev_obs
     # calculate the pbias
-    pbias_val = pbias_score(q_df["Observed"].values, q_df["Modeled"].values)
+    pbias_val = pbias_score(q_df[f"Observed {target}"].values, q_df[f"Modeled {target}"].values)
+    # calculate the peak flow percent error
+    pf_obs, pf_mod = np.max(np.max(q_df[f"Modeled {target}"].values)), np.max(q_df[f"Observed {target}"].values)
+    pfpe_val = ((pf_mod - pf_obs) / pf_obs) * 100
     # compile the statistics into a dataframe
     stats_df = pd.DataFrame(
         {
-            "R2": [r2_val],
-            "NSE": [nse_val],
-            "RSR": [rsr_val],
-            "PBIAS": [pbias_val],
+            f"{target} R2": [r2_val],
+            f"{target} NSE": [nse_val],
+            f"{target} RSR": [rsr_val],
+            f"{target} PBIAS": [pbias_val],
+            f"{target} PFPE": [pfpe_val],
         }
     )
     stats_df.index = [station_id]
