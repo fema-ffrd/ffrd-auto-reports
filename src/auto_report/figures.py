@@ -1785,8 +1785,12 @@ def plot_hydrographs(
 
                 if bfm == "Local":
                     # Get the gage drainage area
-                    site_info = nwis.get_info({"site": station_id}, expanded=True)
-                    drainage_area = site_info["drain_area_va"].values[0] # square miles
+                    try:
+                        site_info = nwis.get_info({"site": station_id}, expanded=True)
+                        drainage_area = site_info["drain_area_va"].values[0] # square miles
+                    except Exception as e:
+                        raise ValueError(f"Failed to acquire drainage area for {station_id}. 
+                                         Try selecting a different baseflow method. Error: {e}")
                 else:
                     drainage_area = None
 
