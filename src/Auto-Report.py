@@ -132,9 +132,6 @@ if __name__ == "__main__":
             "The name of the 2D flow area within the HEC-RAS model. Only necessary if more than one 2D flow area is present."
         )
         DOMAIN_ID = st.text_input("Domain ID", None)
-        st.write(
-            "Filter to main streams that occur X times or more within the NHDPlus HR network"
-        )
         st.write("Filter out old gages or process all available gage data.")
         GAGE_COLLECTION_METHOD = st.radio(
             "Gage Filter Method:",
@@ -144,8 +141,9 @@ if __name__ == "__main__":
             ],
             index=0,
         )
+        st.write("Separate the baseflow from the total flow to derive the direct runoff hydrograph")
         BASEFLOW_METHOD = st.radio(
-            "Baseflow Seperation Method:",
+            "Baseflow Separation Method:",
             [
                 "Eckhardt",
                 "Chapman",
@@ -154,6 +152,9 @@ if __name__ == "__main__":
                 "None",
             ],
             index=0,
+        )
+        st.write(
+            "Filter to main streams that occur X times or more within the NHDPlus HR network"
         )
         STREAM_THRESHOLD = st.number_input("Stream Threshold", 20)
         st.write("National Inventory of Dams (NID) vertical height criteria")
