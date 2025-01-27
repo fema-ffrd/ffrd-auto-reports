@@ -1662,6 +1662,14 @@ def plot_hydrographs(
             # Resample the data to the same timestep frequency of the model
             qobs_df, qsim_df, timestep = format_datetime(qobs_df, qsim_df)
             qobs_start, qsim_start = qobs_df.index[0], qsim_df.index[0]
+            # convert for unit difference between recession POR (daily) and event hydrograph (15-min, 1-hr, etc.)
+            if bfm == "Eckhardt" or bfm == "Chapman" or bfm == "Chapman & Maxwell":
+                if timestep == "1-d":
+                    bfr_k = bfr_k
+                elif timestep == "1-h":
+                    bfr_k = bfr_k ** (1 / 24)
+                elif timestep == "15-min":
+                    bfr_k = bfr_k ** (1 / 96)
             # Ensure both datasets start at the same time
             if qobs_start < qsim_start:
                 qobs_df = qobs_df[qsim_start:]
@@ -1823,6 +1831,14 @@ def plot_hydrographs(
                 # Resample the data to the same timestep frequency of the model
                 qobs_df, qsim_df, timestep = format_datetime(qobs_df, qsim_df)
                 qobs_start, qsim_start = qobs_df.index[0], qsim_df.index[0]
+                # convert for unit difference between recession POR (daily) and event hydrograph (15-min, 1-hr, etc.)
+                if bfm == "Eckhardt" or bfm == "Chapman" or bfm == "Chapman & Maxwell":
+                    if timestep == "1-d":
+                        bfr_k = bfr_k
+                    elif timestep == "1-h":
+                        bfr_k = bfr_k ** (1 / 24)
+                    elif timestep == "15-min":
+                        bfr_k = bfr_k ** (1 / 96)
                 # Ensure both datasets start at the same time
                 if qobs_start < qsim_start:
                     qobs_df = qobs_df[qsim_start:]
