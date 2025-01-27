@@ -30,6 +30,7 @@ from pynhd import HP3D, GeoConnex
 import pygeoutils as geoutils
 import warnings
 
+from baseflow import calc_runoff, get_bfi, get_bfr_k
 from hy_river import (
     get_dem_data,
     get_nhd_flowlines,
@@ -46,6 +47,7 @@ warnings.filterwarnings("ignore")
 plt.rcParams.update({"font.size": 16})
 # Set the display option for floating-point numbers to show only 3 decimal places
 pd.options.display.float_format = "{:.3f}".format
+
 # Functions ###################################################################
 
 
@@ -451,6 +453,9 @@ def plot_stream_network(
             f"No dams found in the NID inventory with a height greater than {nid_dam_height} ft"
         )
         num_dams = 0
+
+    # Intersect USGS gages with the stream network to find the stream COMID
+    
 
     # Check if the USGS gages are available to plot
     if len(df_gages_usgs) > 0:
@@ -1504,8 +1509,10 @@ def format_datetime(qobs_df: pd.DataFrame, qsim_df: pd.DataFrame):
 
 def plot_hydrographs(
     hdf_plan_file_path: str,
+    model_perimeter: gpd.GeoDataFrame,
     df_gages_usgs: gpd.GeoDataFrame,
     parameter: str,
+    bfm: str,
     domain_name: str,
     root_dir: str,
     plan_index: Optional[int] = None,
@@ -1519,10 +1526,14 @@ def plot_hydrographs(
     ----------
     hdf_plan_file_path : str
         The path to the HDF plan file
+    model_perimeter : gpd.GeoDataFrame
+        The perimeter of the model
     df_gages_usgs : gpd.GeoDataFrame
         The USGS gages located within the model perimeter
     parameter : str
         The parameter to plot. One of 'Flow' or 'Stage'
+    bfm : str
+        Base flow method (bfm) selected to separate baseflow from the storm hydrograph.
     domain_name : str
         The name of the domain
     root_dir : str
@@ -1545,7 +1556,8 @@ def plot_hydrographs(
         report_keywords : dict
             The updated values for the keywords
     """
-
+    # initialize this NWIS
+    nwis = NWIS()
     # Open the HDF plan file for the reference line data
     try:
         plan_hdf = RasPlanHdf.open_uri(hdf_plan_file_path)
@@ -1564,6 +1576,12 @@ def plot_hydrographs(
     path_start_date = start_time.strftime("%Y-%m-%d")
     path_end_date = end_time.strftime("%Y-%m-%d")
     print(f"Calibration period: {path_start_date} to {path_end_date}")
+
+    if bfm == "Eckhardt":
+        # Get the maximum baseflow index for the catchment area
+        bfi = get_bfi(model_perimeter)
+    else:
+        bfi = None
 
     if parameter == "Flow":
         y_label_txt = "Streamflow (cfs)"
@@ -1593,8 +1611,26 @@ def plot_hydrographs(
             usgs_site_id = gage_df.site_no.values[0]
             station_id = f"USGS-{usgs_site_id}"
             usgs_datum = gage_df.alt_va.values[0]
+            begin_date = gage_df.begin_date.values[0]
+            end_date = gage_df.end_date.values[0]
             gage_idx = gage_df.index[0] + 1
             print(f"Plotting {station_id} for reference line {line_id}")
+
+            if bfm == "Local":
+                # Get the gage drainage area
+                site_info = nwis.get_info({"site": usgs_site_id}, expanded=True)
+                drainage_area = site_info["drain_area_va"].values[0] # square miles
+            else:
+                drainage_area = None
+
+            if bfm == "Eckhardt" or bfm == "Chapman" or bfm == "Chapman & Maxwell":
+                # Get the baseflow recession coefficient for the gage
+                dates = (begin_date, end_date)
+                gage_daily_por = nwis.get_streamflow([station_id], dates, mmd=False, freq="dv")
+                bfr_k = get_bfr_k(gage_daily_por, station_id)
+                gage_daily_por = None
+            else:
+                bfr_k = None
 
             # Modeled streamflow
             qsim_df = (
@@ -1602,7 +1638,7 @@ def plot_hydrographs(
                 [sim_parameter].to_dataframe()[sim_parameter]
                 .to_frame()
             )
-            qsim_df.columns = ["Modeled"]
+            qsim_df.columns = ["Modeled Hydrograph"]
 
             # Observed streamflow: instantaneous values
             qobs_df = get_nwis(usgs_site_id, obs_parameter, 'iv', path_start_date, path_end_date)
@@ -1621,32 +1657,78 @@ def plot_hydrographs(
             if parameter == "Stage":
                 qobs_df = qobs_df + usgs_datum
 
-            qobs_df.columns = ["Observed"]
+            qobs_df.columns = ["Observed Hydrograph"]
 
             # Resample the data to the same timestep frequency of the model
             qobs_df, qsim_df, timestep = format_datetime(qobs_df, qsim_df)
+            qobs_start, qsim_start = qobs_df.index[0], qsim_df.index[0]
+            # convert for unit difference between recession POR (daily) and event hydrograph (15-min, 1-hr, etc.)
+            if bfm == "Eckhardt" or bfm == "Chapman" or bfm == "Chapman & Maxwell":
+                if timestep == "1-d":
+                    bfr_k = bfr_k
+                elif timestep == "1-h":
+                    bfr_k = bfr_k ** (1 / 24)
+                elif timestep == "15-min":
+                    bfr_k = bfr_k ** (1 / 96)
+            # Ensure both datasets start at the same time
+            if qobs_start < qsim_start:
+                qobs_df = qobs_df[qsim_start:]
+            elif qobs_start > qsim_start:
+                qsim_df = qsim_df[qobs_start:]
+            # Ensure the datasets are the same length
+            if len(qobs_df) > len(qsim_df):
+                qobs_df = qobs_df[:len(qsim_df)]
+            elif len(qobs_df) < len(qsim_df):
+                qsim_df = qsim_df[:len(qobs_df)]
+            # Copy the simulated index to the observed index
+            qobs_df.index = qsim_df.index
 
-            # Calculate the metrics between the observed and modeled streamflow
-            q_df = pd.merge(
-                qobs_df, qsim_df, left_index=True, right_index=True
-            ).dropna()
-            qobs_df, qsim_df = None, None
-            metrics = calc_metrics(q_df, usgs_site_id)
+            if parameter == "Flow":
+                # Separate baseflow from both hydrographs to caculate storm runoff
+                qobs_df, qsim_df = calc_runoff(qobs_df,
+                                               qsim_df,
+                                               bfr_k,
+                                               bfi,
+                                               drainage_area,
+                                               bfm)
+                # Calculate the metrics between the observed and modeled streamflow
+                q_df = pd.merge(
+                    qobs_df, qsim_df, left_index=True, right_index=True
+                ).dropna()
+                qobs_df, qsim_df = None, None
+                hydro_metrics = calc_metrics(q_df, usgs_site_id, "Hydrograph")
+                runoff_metrics = calc_metrics(q_df, usgs_site_id, "Runoff")
+                baseflow_metrics = calc_metrics(q_df, usgs_site_id, "Baseflow")
+                # stack the metrics into a single dataframe
+                metrics = pd.concat([hydro_metrics, runoff_metrics, baseflow_metrics], axis=1)
+            else:
+                # Calculate the metrics between the observed and modeled streamflow
+                q_df = pd.merge(
+                    qobs_df, qsim_df, left_index=True, right_index=True
+                ).dropna()
+                qobs_df, qsim_df = None, None
+                metrics = calc_metrics(q_df, usgs_site_id, "Hydrograph")
 
             # Generate the figure
             fig, ax = plt.subplots(figsize=(10, 10))
             # Plot the modeled vs observed streamflow
-            q_df["Observed"].plot(ax=ax, color="blue", label="Observed", alpha=0.7)
-            q_df["Modeled"].plot(ax=ax, color="red", label="Modeled", alpha=0.7)
+            if parameter == "Flow":
+                q_df["Observed Hydrograph"].plot(ax=ax, color="blue", label="Observed Hydrograph", alpha=0.7)
+                q_df["Observed Baseflow"].plot(ax=ax, color="blue", linestyle="--", label="Baseflow", alpha=0.7)
+                q_df["Modeled Hydrograph"].plot(ax=ax, color="red", label="Modeled Hydrograph", alpha=0.7)
+                q_df["Modeled Baseflow"].plot(ax=ax, color="red", linestyle="--", label="Baseflow", alpha=0.7)
+            else:
+                q_df["Observed Hydrograph"].plot(ax=ax, color="blue", label="Observed", alpha=0.7)
+                q_df["Modeled Hydrograph"].plot(ax=ax, color="red", label="Modeled", alpha=0.7)
             # Add grid lines
             ax.grid()
             # Add a legend
             ax.legend()
+            # Add a title
+            ax.set_title(f"USGS-{usgs_site_id} {usgs_site_name}")
             # Add axis labels
             ax.set_xlabel("Date")
             ax.set_ylabel(y_label_txt)
-            # Add a title
-            ax.set_title(f"USGS-{usgs_site_id} {usgs_site_name}")
             # Set the custom y-axis formatter
             ax.get_yaxis().set_major_formatter(
                 ticker.FuncFormatter(lambda x, p: format(int(x), ","))
@@ -1703,9 +1785,27 @@ def plot_hydrographs(
                 usgs_site_id = gage_df.site_no.values[0]
                 station_id = f"USGS-{usgs_site_id}"
                 usgs_datum = gage_df.alt_va.values[0]
+                begin_date = gage_df.begin_date.values[0]
+                end_date = gage_df.end_date.values[0]
                 gage_idx = gage_df.index[0] + 1
                 print(f"Gage index: {gage_idx}")
                 print(f"Plotting {station_id} for reference line {line_id}")
+
+                if bfm == "Local":
+                    # Get the gage drainage area
+                    site_info = nwis.get_info({"site": station_id}, expanded=True)
+                    drainage_area = site_info["drain_area_va"].values[0] # square miles
+                else:
+                    drainage_area = None
+
+                if bfm == "Eckhardt" or bfm == "Chapman" or bfm == "Chapman & Maxwell":
+                    # Get the baseflow recession coefficient for the gage
+                    dates = (begin_date, end_date)
+                    gage_daily_por = nwis.get_streamflow([station_id], dates, mmd=False, freq="dv")
+                    bfr_k = get_bfr_k(gage_daily_por, station_id)
+                    gage_daily_por = None
+                else:
+                    bfr_k = None
 
                 # Modeled streamflow
                 qsim_df = (
@@ -1730,30 +1830,74 @@ def plot_hydrographs(
 
                 # Resample the data to the same timestep frequency of the model
                 qobs_df, qsim_df, timestep = format_datetime(qobs_df, qsim_df)
+                qobs_start, qsim_start = qobs_df.index[0], qsim_df.index[0]
+                # convert for unit difference between recession POR (daily) and event hydrograph (15-min, 1-hr, etc.)
+                if bfm == "Eckhardt" or bfm == "Chapman" or bfm == "Chapman & Maxwell":
+                    if timestep == "1-d":
+                        bfr_k = bfr_k
+                    elif timestep == "1-h":
+                        bfr_k = bfr_k ** (1 / 24)
+                    elif timestep == "15-min":
+                        bfr_k = bfr_k ** (1 / 96)
+                # Ensure both datasets start at the same time
+                if qobs_start < qsim_start:
+                    qobs_df = qobs_df[qsim_start:]
+                elif qobs_start > qsim_start:
+                    qsim_df = qsim_df[qobs_start:]
+                # Ensure the datasets are the same length
+                if len(qobs_df) > len(qsim_df):
+                    qobs_df = qobs_df[:len(qsim_df)]
+                elif len(qobs_df) < len(qsim_df):
+                    qsim_df = qsim_df[:len(qobs_df)]
+                # Copy the simulated index to the observed index
+                qobs_df.index = qsim_df.index
 
-                # Calculate the metrics between the observed and modeled streamflow
-                q_df = pd.merge(
-                    qobs_df, qsim_df, left_index=True, right_index=True
-                ).dropna()
-                qobs_df, qsim_df = None, None
-                metrics = calc_metrics(q_df, usgs_site_id)
+                if parameter == "Flow":
+                    # Separate baseflow from both hydrographs
+                    qobs_df, qsim_df = calc_runoff(qobs_df,
+                                                   qsim_df,
+                                                   bfr_k,
+                                                   bfi,
+                                                   drainage_area,
+                                                   bfm)
+                    # Calculate the metrics between the observed and modeled streamflow
+                    q_df = pd.merge(
+                        qobs_df, qsim_df, left_index=True, right_index=True
+                    ).dropna()
+                    qobs_df, qsim_df = None, None
+                    hydro_metrics = calc_metrics(q_df, usgs_site_id, "Hydrograph")
+                    runoff_metrics = calc_metrics(q_df, usgs_site_id, "Runoff")
+                    baseflow_metrics = calc_metrics(q_df, usgs_site_id, "Baseflow")
+                    # stack the metrics into a single dataframe
+                    metrics = pd.concat([hydro_metrics, runoff_metrics, baseflow_metrics], axis=1)
+                else:
+                    # Calculate the metrics between the observed and modeled streamflow
+                    q_df = pd.merge(
+                        qobs_df, qsim_df, left_index=True, right_index=True
+                    ).dropna()
+                    qobs_df, qsim_df = None, None
+                    metrics = calc_metrics(q_df, usgs_site_id, "Hydrograph")
 
                 # Generate the figure
                 fig, ax = plt.subplots(figsize=(10, 10))
                 # Plot the modeled vs observed streamflow
-                q_df["Observed"].plot(
-                    ax=ax, color="blue", label="Observed", alpha=0.7
-                )
-                q_df["Modeled"].plot(ax=ax, color="red", label="Modeled", alpha=0.7)
+                if parameter == "Flow":
+                    q_df["Observed Hydrograph"].plot(ax=ax, color="blue", label="Observed Hydrograph", alpha=0.7)
+                    q_df["Observed Baseflow"].plot(ax=ax, color="blue", linestyle="--", label="Baseflow", alpha=0.7)
+                    q_df["Modeled Hydrograph"].plot(ax=ax, color="red", label="Modeled Hydrograph", alpha=0.7)
+                    q_df["Modeled Baseflow"].plot(ax=ax, color="red", linestyle="--", label="Baseflow", alpha=0.7)
+                else:
+                    q_df["Observed Hydrograph"].plot(ax=ax, color="blue", label="Observed", alpha=0.7)
+                    q_df["Modeled Hydrograph"].plot(ax=ax, color="red", label="Modeled", alpha=0.7)
                 # Add grid lines
                 ax.grid()
+                # Add a title
+                ax.set_title(f"USGS-{usgs_site_id} {usgs_site_name}")
                 # Add a legend
                 ax.legend()
                 # Add axis labels
                 ax.set_xlabel("Date")
                 ax.set_ylabel(y_label_txt)
-                # Add a title
-                ax.set_title(f"USGS-{usgs_site_id} {usgs_site_name}")
                 # Set the custom y-axis formatter
                 ax.get_yaxis().set_major_formatter(
                     ticker.FuncFormatter(lambda x, p: format(int(x), ","))

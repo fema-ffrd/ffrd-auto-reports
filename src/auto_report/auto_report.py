@@ -123,6 +123,7 @@ async def auto_report(
     report_keywords: dict,
     input_domain_id: str,
     gage_collection_method: str,
+    baseflow_method: str,
     stream_frequency_threshold: int,
     wse_error_threshold: float,
     num_bins: int,
@@ -150,6 +151,8 @@ async def auto_report(
         Optional input for the domain ID
     gage_collection_method : str
         The method for collecting the gages
+    baseflow_method: str
+        The method for separating the baseflow from the streamflow
     stream_frequency_threshold : int
         The threshold frequency for the stream names. Ex: filter to streams whose
         name occurs 20 times or more within the NHDPlus HR network.
@@ -379,8 +382,10 @@ async def auto_report(
             print('')
             report_document, report_keywords = plot_hydrographs(
                 plan,
+                perimeter,
                 df_gages_usgs,
                 "Flow",
+                baseflow_method,
                 domain_id,
                 session_data_dir,
                 plan_index,
@@ -393,8 +398,10 @@ async def auto_report(
             print('')
             report_document, report_keywords = plot_hydrographs(
                 plan,
+                perimeter,
                 df_gages_usgs,
                 "Stage",
+                baseflow_method,
                 domain_id,
                 session_data_dir,
                 plan_index,
@@ -485,6 +492,7 @@ def main_auto_report(
     report_file_path: str,
     input_domain_id: str,
     gage_collection_method: str,
+    baseflow_method: str,
     stream_frequency_threshold: int,
     wse_error_threshold: float,
     num_bins: int,
@@ -510,6 +518,8 @@ def main_auto_report(
         Optional input for the domain ID
     gage_collection_method : str
         The method for collecting the gages
+    baseflow_method: str
+        The method for separating the baseflow from the streamflow
     stream_frequency_threshold : int
         The threshold frequency for the stream names. Ex: filter to streams whose
         name occurs 20 times or more within the NHDPlus HR network.
@@ -546,6 +556,7 @@ def main_auto_report(
                 report_keywords,
                 input_domain_id,
                 gage_collection_method,
+                baseflow_method,
                 stream_frequency_threshold,
                 wse_error_threshold,
                 num_bins,
@@ -566,6 +577,7 @@ def main_auto_report(
                 report_keywords,
                 input_domain_id,
                 gage_collection_method,
+                baseflow_method,
                 stream_frequency_threshold,
                 wse_error_threshold,
                 num_bins,

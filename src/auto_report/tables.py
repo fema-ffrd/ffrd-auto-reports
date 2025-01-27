@@ -167,7 +167,7 @@ def evaluate_metrics(x):
     """
     # make a copy of the dataframe
     df = x.copy()
-    df["R2"] = df["R2"].apply(
+    df["Hydrograph R2"] = df["Hydrograph R2"].apply(
         lambda x: (
             "Very Good"
             if x > 0.65 and x <= 1.0
@@ -178,7 +178,7 @@ def evaluate_metrics(x):
             )
         )
     )
-    df["NSE"] = df["NSE"].apply(
+    df["Hydrograph NSE"] = df["Hydrograph NSE"].apply(
         lambda x: (
             "Very Good"
             if x > 0.65 and x <= 1.0
@@ -189,7 +189,7 @@ def evaluate_metrics(x):
             )
         )
     )
-    df["RSR"] = df["RSR"].apply(
+    df["Hydrograph RSR"] = df["Hydrograph RSR"].apply(
         lambda x: (
             "Very Good"
             if x > 0 and x <= 0.6
@@ -200,7 +200,7 @@ def evaluate_metrics(x):
             )
         )
     )
-    df["PBIAS"] = df["PBIAS"].apply(
+    df["Hydrograph PBIAS"] = df["Hydrograph PBIAS"].apply(
         lambda x: (
             "Very Good"
             if x <= 15
@@ -242,29 +242,29 @@ def fill_calibration_metrics_table(
     for gage_id, row in metrics_df.iterrows():
         report_keywords[f"plan0{plan_index}_gage0{row_index}"] = gage_id
         report_keywords[f"plan0{plan_index}_gage0{row_index}_{parameter}_nse"] = str(
-            row["NSE"]
+            row["Hydrograph NSE"]
         )
         report_keywords[f"plan0{plan_index}_gage0{row_index}_{parameter}_rsr"] = str(
-            row["RSR"]
+            row["Hydrograph RSR"]
         )
         report_keywords[f"plan0{plan_index}_gage0{row_index}_{parameter}_pbias"] = str(
-            row["PBIAS"]
+            row["Hydrograph PBIAS"]
         )
-        report_keywords[f"plan0{plan_index}_gage0{row_index}_{parameter}_r2"] = str(row["R2"])
+        report_keywords[f"plan0{plan_index}_gage0{row_index}_{parameter}_r2"] = str(row["Hydrograph R2"])
         row_index = row_index + 1
 
     row_index = 1
     eval_df = evaluate_metrics(metrics_df)
     for gage_id, row in eval_df.iterrows():
         report_keywords[f"plan0{plan_index}_gage0{row_index}_{parameter}_nse_eval"] = row[
-            "NSE"
+            "Hydrograph NSE"
         ]
         report_keywords[f"plan0{plan_index}_gage0{row_index}_{parameter}_rsr_eval"] = row[
-            "RSR"
+            "Hydrograph RSR"
         ]
         report_keywords[f"plan0{plan_index}_gage0{row_index}_{parameter}_pbias_eval"] = row[
-            "PBIAS"
+            "Hydrograph PBIAS"
         ]
-        report_keywords[f"plan0{plan_index}_gage0{row_index}_{parameter}_r2_eval"] = row["R2"]
+        report_keywords[f"plan0{plan_index}_gage0{row_index}_{parameter}_r2_eval"] = row["Hydrograph R2"]
         row_index = row_index + 1
     return report_keywords
