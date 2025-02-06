@@ -37,10 +37,14 @@ from auto_report import main_auto_report
 # layout options: wide, centered, or full-width
 st.set_page_config(layout="wide", page_icon="💧")
 
+
+# Specify if the script is being run in development or production
+session_type = "dev"
+
 if __name__ == "__main__":
     # setup a session data when app is first opened or browser reset
     if "session_id" not in st.session_state:
-        initialize_session(rootDir)
+        initialize_session(rootDir, session_type)
     session_data_dir = st.session_state["session_data_dir"]
 
     st.title(
@@ -205,6 +209,7 @@ if __name__ == "__main__":
                     )
                     st.session_state["data_acquired"] = True
                     st.success("Report successfully generated!")
+                    st.balloons()
                 except Exception as e:
                     st.error(f"Error: {e}")
                     st.stop()
