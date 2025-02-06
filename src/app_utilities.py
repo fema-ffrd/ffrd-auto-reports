@@ -37,29 +37,39 @@ def remove_all_folders(directory):
             shutil.rmtree(file_path)
 
 
-def initialize_session(root_directory: str):
+def initialize_session(root_directory: str, session_type: str):
     """
     When app is first opened or browser refreshed reset the session info and
     make required folders
 
     Parameters
     ----------
-    None
+    root_directory : str
+        The root directory of the application
+    session_type : str
+        The type of session to initialize. Either 'dev' or 'prod'
 
     Returns
     -------
     None
     """
-    load_dotenv(".env")
-    os.environ["STREAMLIT_SERVER_MAX_UPLOAD_SIZE"] = os.getenv(
-        "STREAMLIT_SERVER_MAX_UPLOAD_SIZE"
-    )
-    os.environ["STREAMLIT_SERVER_RUN_ON_SAVE"] = os.getenv(
-        "STREAMLIT_SERVER_RUN_ON_SAVE"
-    )
-    os.environ["STREAMLIT_THEME_PRIMARY_COLOR"] = os.getenv(
-        "STREAMLIT_THEME_PRIMARY_COLOR"
-    )
+    if session_type == "dev":
+      load_dotenv(".env")
+      os.environ["STREAMLIT_SERVER_MAX_UPLOAD_SIZE"] = os.getenv(
+          "STREAMLIT_SERVER_MAX_UPLOAD_SIZE"
+      )
+      os.environ["STREAMLIT_SERVER_RUN_ON_SAVE"] = os.getenv(
+          "STREAMLIT_SERVER_RUN_ON_SAVE"
+      )
+      os.environ["STREAMLIT_THEME_PRIMARY_COLOR"] = os.getenv(
+          "STREAMLIT_THEME_PRIMARY_COLOR"
+      )
+    else:
+      # load secrets from streamlit secrets
+      os.environ["AWS_ACCESS_KEY_ID"] = st.secrets["AWS_ACCESS_KEY_ID"]
+      os.environ["AWS_SECRET_ACCESS_KEY"] = st.secrets["AWS_SECRET_ACCESS_KEY"]
+      os.environ["STREAMLIT_THEME_PRIMARY_COLOR"] = st.secrets["STREAMLIT_THEME_PRIMARY_COLOR"]
+
     # Capture the timestamp of the session: year_month_day_hour_minute_second_microsecond
     st.session_state["session_id"] = datetime.now()
     # Assign the timestamp to a string variable for the session id
