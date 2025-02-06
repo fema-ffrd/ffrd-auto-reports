@@ -48,7 +48,7 @@ def calc_metrics(q_df: pd.DataFrame, station_id: str, target: str):
         String unique identified for USGS gage
     target: str
         Column target variable for calculating the statistics.
-        One of ['Hydrograph', 'Runoff', 'Baseflow']
+        One of Hydrograph or Baseflow
 
     Returns
     -------
@@ -65,16 +65,7 @@ def calc_metrics(q_df: pd.DataFrame, station_id: str, target: str):
         else:   
             # calculate the peak flow percent error
             pf_obs, pf_mod = np.max(np.max(q_df[f"Modeled {target}"].values)), np.max(q_df[f"Observed {target}"].values)
-            pfpe_val = ((pf_mod - pf_obs) / pf_obs) * 100
-        #    stats_df = pd.DataFrame(
-        #       {
-        #            f"{target} R2": [np.nan],
-        #            f"{target} NSE": [np.nan],
-        #            f"{target} RSR": [np.nan],
-        #            f"{target} PBIAS": [np.nan],
-        #            f"{target} PFPE": [np.nan],
-        #        }
-        #    )
+            pfpe_val = (abs(pf_mod - pf_obs) / pf_obs) * 100
             stats_df = pd.DataFrame({
 
                 f"{target} PFPE": [pfpe_val]
@@ -82,35 +73,36 @@ def calc_metrics(q_df: pd.DataFrame, station_id: str, target: str):
             })
             stats_df.index = [station_id]
             return stats_df
-    # create a regression metric object
-    evaluator = RegressionMetric(
-        y_true=q_df[f"Observed {target}"].values.reshape(-1, 1),
-        y_pred=q_df[f"Modeled {target}"].values.reshape(-1, 1),
-    )
-    # calculate the r2
-    r2_val = evaluator.R2()
-    # calculate the nse
-    nse_val = evaluator.nash_sutcliffe_efficiency()
-    # calculate the rmse
-    rmse_val = evaluator.root_mean_squared_error()
-    # calculate the std dev
-    std_dev_obs = np.std(q_df[f"Observed {target}"].values)
-    # calculate the rsr
-    rsr_val = rmse_val / std_dev_obs
-    # calculate the pbias
-    pbias_val = pbias_score(q_df[f"Observed {target}"].values, q_df[f"Modeled {target}"].values)
-    # calculate the peak flow percent error
-    pf_obs, pf_mod = np.max(np.max(q_df[f"Modeled {target}"].values)), np.max(q_df[f"Observed {target}"].values)
-    pfpe_val = ((pf_mod - pf_obs) / pf_obs) * 100
-    # compile the statistics into a dataframe
-    stats_df = pd.DataFrame(
-        {
-            f"{target} R2": [r2_val],
-            f"{target} NSE": [nse_val],
-            f"{target} RSR": [rsr_val],
-            f"{target} PBIAS": [pbias_val],
-            f"{target} PFPE": [pfpe_val],
-        }
-    )
-    stats_df.index = [station_id]
-    return stats_df
+    else:
+        # create a regression metric object
+        evaluator = RegressionMetric(
+            y_true=q_df[f"Observed {target}"].values.reshape(-1, 1),
+            y_pred=q_df[f"Modeled {target}"].values.reshape(-1, 1),
+        )
+        # calculate the r2
+        r2_val = evaluator.R2()
+        # calculate the nse
+        nse_val = evaluator.nash_sutcliffe_efficiency()
+        # calculate the rmse
+        rmse_val = evaluator.root_mean_squared_error()
+        # calculate the std dev
+        std_dev_obs = np.std(q_df[f"Observed {target}"].values)
+        # calculate the rsr
+        rsr_val = rmse_val / std_dev_obs
+        # calculate the pbias
+        pbias_val = pbias_score(q_df[f"Observed {target}"].values, q_df[f"Modeled {target}"].values)
+        # calculate the peak flow percent error
+        pf_obs, pf_mod = np.max(np.max(q_df[f"Modeled {target}"].values)), np.max(q_df[f"Observed {target}"].values)
+        pfpe_val = (abs(pf_mod - pf_obs) / pf_obs) * 100
+        # compile the statistics into a dataframe
+        stats_df = pd.DataFrame(
+            {
+                f"{target} R2": [r2_val],
+                f"{target} NSE": [nse_val],
+                f"{target} RSR": [rsr_val],
+                f"{target} PBIAS": [pbias_val],
+                f"{target} PFPE": [pfpe_val],
+            }
+        )
+        stats_df.index = [station_id]
+        return stats_df
