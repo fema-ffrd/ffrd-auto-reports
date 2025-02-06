@@ -3,7 +3,6 @@
 # Imports #####################################################################
 
 import os
-import shutil
 import asyncio
 import nest_asyncio
 import pandas as pd
@@ -15,10 +14,7 @@ import streamlit as st
 from hy_river import get_usgs_stations
 
 # from hdf_utils import get_hdf_geom, get_hdf_plan
-from hdf_utils import (
-    get_bulk_hdf_geom,
-    get_bulk_hdf_plan,
-)
+from hdf_utils import get_bulk_hdf_geom
 
 from figures import (
     plot_pilot_study_area,
@@ -35,8 +31,7 @@ from figures import (
 from tables import (
     fill_proj_table,
     fill_gage_table,
-    fill_nid_dams_table,
-    fill_computation_settings_table,
+    fill_nid_dams_table
 )
 
 
