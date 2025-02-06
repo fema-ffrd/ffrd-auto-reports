@@ -6,7 +6,6 @@ import sys
 import os
 import zipfile
 import asyncio
-import numpy as np
 import streamlit as st
 from pathlib import Path
 import warnings
