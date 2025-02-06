@@ -255,7 +255,7 @@ particles_js = """<!DOCTYPE html>
         },
         "move": {
           "enable": true,
-          "speed": 0.2,
+          "speed": 0.9,
           "direction": "none",
           "random": false,
           "straight": false,
