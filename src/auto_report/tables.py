@@ -218,26 +218,27 @@ def evaluate_metrics(x):
     df["Hydrograph PFPE"] = df["Hydrograph PFPE"].apply(
         lambda x: (
             "Very Good"
-            if x <= 10
+            if x <= 5
             else (
                 "Good"
-                if x >= 10 and x < 20
-                else ("Satifactory" if x >= 20 and x < 30 else "Unsatisfactory")
+                if x >= 5 and x < 10
+                else ("Satifactory" if x >= 10 and x < 15 else "Unsatisfactory")
             )
         )
     )
     # For Baseflow PFPE (Baseflow Peak Error (%))
-    df["Baseflow PFPE"] = df["Baseflow PFPE"].apply(
-        lambda x: (
-            "Very Good"
-            if x <= 10
-            else (
-                "Good"
-                if x >= 10 and x < 20
-                else ("Satifactory" if x >= 20 and x < 30 else "Unsatisfactory")
+    if "Baseflow PFPE" in df.columns:
+        df["Baseflow PFPE"] = df["Baseflow PFPE"].apply(
+            lambda x: (
+                "Very Good"
+                if x <= 5
+                else (
+                    "Good"
+                    if x >= 5 and x < 10
+                    else ("Satifactory" if x >= 10 and x < 15 else "Unsatisfactory")
+                )
             )
         )
-    )
 
     return df
 
@@ -281,7 +282,8 @@ def fill_calibration_metrics_table(
         report_keywords[f"plan0{plan_index}_gage0{row_index}_{parameter}_r2"] = str(row["Hydrograph R2"])
         # Add new metrics to the report
         report_keywords[f"plan0{plan_index}_gage0{row_index}_{parameter}_pfpe"] = str(row["Hydrograph PFPE"])
-        report_keywords[f"plan0{plan_index}_gage0{row_index}_{parameter}_bf_pfpe"] = str(row["Baseflow PFPE"])
+        if "Baseflow PFPE" in metrics_df.columns:
+            report_keywords[f"plan0{plan_index}_gage0{row_index}_{parameter}_bf_pfpe"] = str(row["Baseflow PFPE"])
         row_index = row_index + 1
 
     row_index = 1
@@ -299,6 +301,7 @@ def fill_calibration_metrics_table(
         report_keywords[f"plan0{plan_index}_gage0{row_index}_{parameter}_r2_eval"] = row["Hydrograph R2"]
         # Add the evaluation for the new metrics to the report
         report_keywords[f"plan0{plan_index}_gage0{row_index}_{parameter}_pfpe_eval"] = row["Hydrograph PFPE"]
-        report_keywords[f"plan0{plan_index}_gage0{row_index}_{parameter}_bf_pfpe_eval"] = row["Baseflow PFPE"]
+        if "Baseflow PFPE" in eval_df.columns:
+            report_keywords[f"plan0{plan_index}_gage0{row_index}_{parameter}_bf_pfpe_eval"] = row["Baseflow PFPE"]
         row_index = row_index + 1
     return report_keywords
