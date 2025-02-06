@@ -1697,10 +1697,10 @@ def plot_hydrographs(
                 ).dropna()
                 qobs_df, qsim_df = None, None
                 hydro_metrics = calc_metrics(q_df, usgs_site_id, "Hydrograph")
-                runoff_metrics = calc_metrics(q_df, usgs_site_id, "Runoff")
+                # runoff_metrics = calc_metrics(q_df, usgs_site_id, "Runoff")
                 baseflow_metrics = calc_metrics(q_df, usgs_site_id, "Baseflow")
                 # stack the metrics into a single dataframe
-                metrics = pd.concat([hydro_metrics, runoff_metrics, baseflow_metrics], axis=1)
+                metrics = pd.concat([hydro_metrics, baseflow_metrics], axis=1)
             else:
                 # Calculate the metrics between the observed and modeled streamflow
                 q_df = pd.merge(

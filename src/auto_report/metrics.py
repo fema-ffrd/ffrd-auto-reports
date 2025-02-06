@@ -55,18 +55,31 @@ def calc_metrics(q_df: pd.DataFrame, station_id: str, target: str):
     stats_df : pandas dataframe
         Dataframe of streamflow calibration statistics. Columns are the plan column id and the rows are the statistics
     """
+    # check if the target is baseflow or hydrograph
+
     if target == "Baseflow":
         # check if either the observed or modeled baseflow is all zeros
+        # For baseflow, only PFPE metric is calculated as requested
         if np.all(q_df[f"Observed {target}"].values == 0) or np.all(q_df[f"Modeled {target}"].values == 0):
-            stats_df = pd.DataFrame(
-                {
-                    f"{target} R2": [np.nan],
-                    f"{target} NSE": [np.nan],
-                    f"{target} RSR": [np.nan],
-                    f"{target} PBIAS": [np.nan],
-                    f"{target} PFPE": [np.nan],
-                }
-            )
+            pfpe_val = np.nan
+        else:   
+            # calculate the peak flow percent error
+            pf_obs, pf_mod = np.max(np.max(q_df[f"Modeled {target}"].values)), np.max(q_df[f"Observed {target}"].values)
+            pfpe_val = ((pf_mod - pf_obs) / pf_obs) * 100
+        #    stats_df = pd.DataFrame(
+        #       {
+        #            f"{target} R2": [np.nan],
+        #            f"{target} NSE": [np.nan],
+        #            f"{target} RSR": [np.nan],
+        #            f"{target} PBIAS": [np.nan],
+        #            f"{target} PFPE": [np.nan],
+        #        }
+        #    )
+            stats_df = pd.DataFrame({
+
+                f"{target} PFPE": [pfpe_val]
+                
+            })
             stats_df.index = [station_id]
             return stats_df
     # create a regression metric object
